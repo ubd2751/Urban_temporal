@@ -390,7 +390,7 @@ box_sr_plant <-
       fill = "Time",
       title = "Plant"
     ) +
-    theme_bw(base_size = 9) +
+    theme_bw(base_size = 8) +
     theme(
       panel.grid = element_blank(),
       legend.position = "none"
