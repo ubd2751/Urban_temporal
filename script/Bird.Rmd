@@ -1,0 +1,785 @@
+---
+title: "Bird"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  root.dir = "/temp")
+```
+
+# Package
+
+```{r package, include=FALSE}
+pacman::p_load(
+  tidyverse,  # data management
+  rtry, austraits,  # trait
+  lme4, lmerTest, broom,  # GLM
+  ggeffects, patchwork, ggsci,  # ggplot
+  vegan, # composition
+  ggcorrplot, ggbiplot
+  )
+```
+
+# Data frame
+
+Load a data frame
+
+```{r , include=FALSE}
+# survey data
+bird <- read_csv("data/bird_survey.csv")
+
+# scientific name
+bird_sciname <- read_csv("data/bird_sciname.csv")
+
+# trait 
+#bird_trait <- read_csv("data/bird_trait_avonet.csv")
+bird_trait_life   <- read_csv("data/bird_trait_birdlife.csv")
+bird_trait_ebird  <- read_csv("data/bird_trait_ebird.csv")
+bird_trait_tree   <- read_csv("data/bird_trait_birdtree.csv")
+bird_trait_avonet <- read_csv("data/bird_trait_avonet.csv")
+
+# exotic
+bird_exotic <- read_csv("data/bird_exotic.csv")
+
+# Environmental variables
+env <- read_csv("data/Environment.csv")
+```
+
+Data frame for bird trait
+```{r}
+df_bird_trait <- 
+  bind_rows(
+  
+    # birdlife
+    bird_trait_life %>% 
+      dplyr::select(Species1, Beak.Length_Culmen:Mass) %>% 
+      dplyr::rename(sciname = Species1),
+    
+    # ebird
+    bird_trait_ebird %>% 
+      dplyr::select(Species2, Beak.Length_Culmen:Mass) %>% 
+      dplyr::rename(sciname = Species2),
+    
+    # birdtree
+    bird_trait_tree%>% 
+      dplyr::select(Species3, Beak.Length_Culmen:Mass) %>% 
+      dplyr::rename(sciname = Species3),
+    
+    # Avonet
+    bird_trait_avonet %>% 
+      dplyr::select(Species1_BirdLife, Beak.Length_Culmen:Tail.Length) %>% 
+      mutate(Mass = NA) %>% 
+      dplyr::rename(sciname = Species1_BirdLife)
+    ) %>% 
+  group_by(sciname) %>% 
+  dplyr::summarise(across(where(is.numeric), ~mean(., na.rm = TRUE))) %>% 
+  print()
+```
+Combine the all data
+```{r }
+df_bird <- 
+  bird %>% 
+    as_tibble() %>% 
+    mutate(time = if_else(str_detect(site, "過去"), "past", "now")) %>% 
+    select(site, time, everything()) %>% 
+    mutate(site = str_sub(site, end = -3)) %>% 
+    pivot_longer(-c(site, time), names_to = "species") %>% 
+    filter(value == 1) %>% 
+    
+    # combine scientific name + Exotic 
+    left_join(
+      bird_sciname %>% 
+        select(species, sciname) %>% 
+        mutate(exotic = "Native") %>% 
+        filter(species != "カササギ") %>% 
+        bind_rows(bird_exotic), 
+      by = "species") %>% 
+    
+    
+    # combine trait data
+    left_join(df_bird_trait, by = "sciname") %>% 
+    
+    print()
+```
+```{r}
+# Number of species of no trait data
+df_bird %>% 
+  filter(is.na(Mass)) %>% 
+  distinct(species, sciname)
+
+
+
+#
+df_bird %>% 
+  na.omit() %>% 
+  select(where(is.numeric) & -value) %>% 
+  prcomp(scale = TRUE) %>% 
+  biplot()
+```
+
+
+
+# Species richness
+
+Estimate a species richness
+
+```{r}
+sr_bird <-
+  df_bird %>% 
+    group_by(site, time, exotic) %>% 
+    dplyr::summarise(sr = n_distinct(species)) %>% 
+    filter(exotic != "unknown") %>% 
+    pivot_wider(names_from = "exotic", values_from = "sr",
+                values_fill = list(sr = 0)) %>% 
+    mutate(All = Native + Exotic) %>% 
+    pivot_longer(c(All, Native, Exotic), 
+                 values_to = "sr", names_to = "exotic") %>% 
+    mutate(
+    exotic = recode_factor(
+      exotic, 
+      "All" = "All species",
+      "Native" = "Native species",
+      "Exotic" = "Exotic species"),
+    time = recode_factor(
+      time,
+      "past" = "Past",
+      "now"  = "Now")
+    ) %>% 
+    print()
+```
+
+### Boxplot
+
+Comparison of species richness
+
+```{r}
+box_sr_bird <- 
+  ggplot(data = sr_bird,
+         aes(x = time, y = sr, fill = time)) +
+    geom_boxplot() +
+    facet_wrap(~exotic, scales = "free", ncol = 3) +
+    labs(
+      x = "Time",
+      y = "Species richness",
+      fill = "Time"
+    ) +
+    theme_bw(base_size = 8) +
+    theme(
+      panel.grid = element_blank(),
+      legend.position = "none"
+      )
+
+box_sr_bird
+```
+
+```{r eval=FALSE, include=FALSE}
+# For save
+ggsave(
+  box_sr_bird,
+  file = "output/box_sr_bird.png",
+  width = 160, height = 60, units = "mm", dpi = 500)
+```
+
+
+
+# Lost and add species
+
+Estimate a lost and added species richness
+
+```{r}
+df_bird_lost_add <-
+  df_bird %>% 
+    filter(exotic != "unknown") %>% 
+    pivot_wider(names_from = time, values_from = value) %>% 
+    dplyr::rename(HWI = "Hand-Wing.Index") %>% 
+    mutate(
+      now = if_else(is.na(now), 0, 1),
+      past = if_else(is.na(past), 0, 1),
+      lost = if_else(past == 1 & now == 0, 1, 0),
+      add  = if_else(past == 0 & now == 1, 1, 0)
+      ) %>% 
+    left_join(env, by = "site") %>% 
+    mutate(exotic = factor(exotic, levels = c("Native", "Exotic"))) %>% 
+    print()
+```
+
+### Lost species
+
+#### Trait
+Relationships between lost of species and trait
+
+GLM
+```{r}
+glm_lost_trait_bird <- 
+  df_bird_lost_add %>% 
+    group_by(exotic) %>% 
+    nest() %>% 
+    mutate(
+       fit = map(data, ~glm(lost ~ Mass + Beak.Length_Culmen + HWI, 
+                            family = "binomial",  data = .)),
+       summary = map(fit, ~tidy(.)),
+       pred = map(fit, ~ggpredict(., terms="HWI [all]"))
+       ) %>% 
+    ungroup() %>% 
+    print()
+```
+Table for result of GLM
+```{r}
+tb_glm_lost_trait_bird <- 
+  glm_lost_trait_bird %>% 
+    dplyr::select(exotic, summary) %>% 
+    unnest(summary) %>% 
+    filter(term != "(Intercept)") %>% 
+    mutate(
+      across(where(is.numeric),
+             ~if_else(. < 0.001,
+                      formatC(., digits = 3, format = "fg"),
+                      formatC(., digits = 3, format = "e"))
+      )) %>% 
+    dplyr::rename(
+      "Explanatory variables" = term,
+      Estimate = estimate,
+      Std.error = std.error,
+      Statistic = statistic) %>% 
+    print()
+```
+Plot for the result of GLM
+```{r}
+theme_set(theme_classic(base_size = 9))
+
+# Hand-Wing.Index
+p_glm_lost_bird_hwi <- 
+  ggplot() +
+    geom_point(
+      data = df_bird_lost_add,
+      aes(x = HWI, y = lost, color = exotic, shape = exotic)) +
+    geom_smooth(
+      data = glm_lost_trait_bird %>% 
+        select(exotic, pred) %>% 
+        unnest(pred) %>% 
+        filter(exotic == "Native"),
+      aes(x = x, y = predicted, color = exotic),
+      method = "glm", method.args=list(family="binomial"), se = FALSE) +
+    labs(
+      x = "Hand-Wing.Index",
+      y = "Probability of species loss"
+      ) +
+      scale_color_simpsons() +
+      theme(
+        strip.placement = "outside",
+        strip.background = element_blank(),
+        strip.text = element_text(size = 9),
+        legend.position = c(0.3, 0.8),
+        legend.title = element_blank()
+        )
+
+# Body mass
+p_glm_lost_bird_mass <- 
+  ggplot() +
+    geom_point(
+      data = df_bird_lost_add,
+      aes(x = Mass, y = lost, color = exotic, shape = exotic)) +
+    labs(
+      x = "Body mass",
+      y = ""
+      ) +
+    scale_color_simpsons() +
+      theme(
+        axis.title.y = element_blank(),
+        strip.placement = "outside",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        legend.position = "none"
+      )
+
+
+# Beak length
+p_glm_lost_bird_beak <- 
+  ggplot() +
+    geom_point(
+      data = df_bird_lost_add,
+      aes(x = Beak.Length_Culmen, y = lost, color = exotic, shape = exotic)) +
+      labs(
+        x = "Beak length",
+        y = ""
+      ) +
+      scale_color_simpsons() +
+      theme(
+        axis.title.y = element_blank(),
+        strip.placement = "outside",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        legend.position = "none"
+      )
+
+
+
+# Combine
+p_glm_lost_bird_hwi + p_glm_lost_bird_mass + p_glm_lost_bird_beak 
+```
+```{r eval=FALSE, include=FALSE}
+# For save
+ggsave(
+  p_glm_lost_bird_hwi + p_glm_lost_bird_mass + p_glm_lost_bird_beak ,
+  file = "output/plot_glm_lost_trait_bird.png",
+  width = 160, height = 90, units = "mm", dpi = 500)
+```
+
+
+#### Environment
+Relationships between lost of species and trait using GLM
+
+GLM
+```{r}
+glm_lost_env_bird <- 
+  df_bird_lost_add %>% 
+    group_by(exotic) %>% 
+    nest() %>% 
+    mutate(
+       fit = map(data, ~glm(lost ~ year + area + green_rate, 
+                            family = "binomial",  data = .)),
+       summary = map(fit, ~tidy(.)),
+       pred = map(fit, ~ggpredict(.))
+       ) %>% 
+    ungroup() %>% 
+    print()
+```
+Table for result of GLM
+```{r}
+tb_glm_lost_env_bird <- 
+  glm_lost_env_bird %>% 
+    dplyr::select(exotic, summary) %>% 
+    unnest(summary) %>% 
+    filter(term != "(Intercept)") %>% 
+    dplyr::mutate(
+      across(where(is.numeric),
+             ~if_else(abs(.) >= 0.001,
+                      round(., digits = 3), .)
+      )) %>% 
+    dplyr::rename(
+      "Explanatory variables" = term,
+      Estimate = estimate,
+      Std.error = std.error,
+      Statistic = statistic) %>% 
+    print()
+```
+Plot for the result of GLM
+```{r}
+theme_set(theme_classic(base_size = 9))
+
+# Year
+p_glm_lost_bird_year <- 
+  ggplot() +
+    geom_point(
+      data = df_bird_lost_add,
+      aes(x = year, y = lost, color = exotic, shape = exotic)) +
+    geom_smooth(
+      data = glm_lost_env_bird %>% 
+        select(exotic, pred) %>% 
+        unnest(pred) %>% 
+        unnest(pred) %>% 
+        filter(exotic == "Native" & group == "year"),
+      aes(x = x, y = predicted, color = exotic),
+      method = "glm", method.args=list(family="binomial"), se = FALSE) +
+    labs(
+      x = "Year",
+      y = "Probability of species loss"
+      ) +
+      scale_color_simpsons() +
+      theme(
+        strip.placement = "outside",
+        strip.background = element_blank(),
+        strip.text = element_text(size = 9),
+        legend.position = c(0.3, 0.8),
+        legend.title = element_blank()
+        )
+
+# Area
+p_glm_lost_bird_area <- 
+  ggplot() +
+    geom_point(
+      data = df_bird_lost_add,
+      aes(x = area/10000, y = lost, color = exotic, shape = exotic)) +
+    geom_smooth(
+      data = glm_lost_env_bird %>% 
+        select(exotic, pred) %>% 
+        unnest(pred) %>% 
+        unnest(pred) %>% 
+        filter(exotic == "Native" & group == "area"),
+      aes(x/10000, predicted, color = exotic),
+      method = "glm", method.args=list(family="binomial"), se = FALSE) +
+    labs(
+      x = "Area",
+      y = ""
+      ) +
+    scale_color_simpsons() +
+      theme(
+        axis.title.y = element_blank(),
+        strip.placement = "outside",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        legend.position = "none"
+      )
+
+
+# Green rate
+p_glm_lost_bird_green <- 
+  ggplot() +
+    geom_point(
+      data = df_bird_lost_add,
+      aes(x = green_rate, y = lost, color = exotic, shape = exotic)) +
+      labs(
+        x = "Green rate",
+        y = ""
+      ) +
+      scale_color_simpsons() +
+      theme(
+        axis.title.y = element_blank(),
+        strip.placement = "outside",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        legend.position = "none"
+      )
+
+
+
+# Combine
+p_glm_lost_bird_year + p_glm_lost_bird_area + p_glm_lost_bird_green
+```
+```{r eval=FALSE, include=FALSE}
+# For save
+ggsave(
+  p_glm_lost_bird_year + p_glm_lost_bird_area + p_glm_lost_bird_green,
+  file = "output/plot_glm_lost_env_bird.png",
+  width = 160, height = 90, units = "mm", dpi = 500)
+```
+
+
+### Added species
+
+#### Trait
+Relationships between species immigration and trait
+
+GLM
+```{r}
+glm_add_trait_bird <- 
+  df_bird_lost_add %>% 
+    group_by(exotic) %>% 
+    nest() %>% 
+    mutate(
+       fit = map(data, ~glm(add ~ Mass + Beak.Length_Culmen + HWI, 
+                            family = "binomial",  data = .)),
+       summary = map(fit, ~tidy(.)),
+       pred = map(fit, ~ggpredict(.))
+       ) %>% 
+    ungroup() %>% 
+    print()
+```
+Table for result of GLM
+```{r}
+tb_glm_add_trait_bird <- 
+  glm_add_trait_bird %>% 
+    dplyr::select(exotic, summary) %>% 
+    unnest(summary) %>% 
+    filter(term != "(Intercept)") %>% 
+    mutate(
+      across(where(is.numeric),
+             ~if_else(. < 0.001,
+                      formatC(., digits = 3, format = "fg"),
+                      formatC(., digits = 3, format = "e"))
+      )) %>% 
+    dplyr::rename(
+      "Explanatory variables" = term,
+      Estimate = estimate,
+      Std.error = std.error,
+      Statistic = statistic) %>% 
+    print()
+```
+Plot for the result of GLM
+```{r}
+theme_set(theme_classic(base_size = 9))
+
+# Hand-Wing.Index
+p_glm_add_bird_hwi <- 
+  ggplot() +
+    geom_point(
+      data = df_bird_lost_add,
+      aes(x = HWI, y = add, color = exotic, shape = exotic)) +
+    labs(
+      x = "Hand-Wing.Index",
+      y = "Probability of species immigration"
+      ) +
+      scale_color_simpsons() +
+      theme(
+        strip.placement = "outside",
+        strip.background = element_blank(),
+        strip.text = element_text(size = 9),
+        legend.position = c(0.3, 0.8),
+        legend.title = element_blank()
+        )
+
+# Body mass
+p_glm_add_bird_mass <- 
+  ggplot() +
+    geom_point(
+      data = df_bird_lost_add,
+      aes(x = Mass, y = add, color = exotic, shape = exotic)) +
+    labs(
+      x = "Body mass",
+      y = ""
+      ) +
+    scale_color_simpsons() +
+      theme(
+        axis.title.y = element_blank(),
+        strip.placement = "outside",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        legend.position = "none"
+      )
+
+
+# Beak length
+p_glm_add_bird_beak <- 
+  ggplot() +
+    geom_point(
+      data = df_bird_lost_add,
+      aes(x = Beak.Length_Culmen, y = add, color = exotic, shape = exotic)) +
+      labs(
+        x = "Beak length",
+        y = ""
+      ) +
+      scale_color_simpsons() +
+      theme(
+        axis.title.y = element_blank(),
+        strip.placement = "outside",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        legend.position = "none"
+      )
+
+
+
+# Combine
+p_glm_add_bird_hwi + p_glm_add_bird_mass + p_glm_add_bird_beak 
+```
+```{r eval=FALSE, include=FALSE}
+# For save
+ggsave(
+  p_glm_add_bird_hwi + p_glm_add_bird_mass + p_glm_add_bird_beak,
+  file = "output/plot_glm_add_trait_bird.png",
+  width = 160, height = 90, units = "mm", dpi = 500)
+```
+
+
+
+
+
+#### Environment
+Relationships between immigration species and trait
+
+GLM
+```{r}
+glm_add_env_bird <- 
+  df_bird_lost_add %>% 
+    group_by(exotic) %>% 
+    nest() %>% 
+    mutate(
+       fit = map(data, ~glm(add ~ year + area + green_rate, 
+                            family = "binomial",  data = .)),
+       summary = map(fit, ~tidy(.)),
+       pred = map(fit, ~ggpredict(.))
+       ) %>% 
+    ungroup() %>% 
+    print()
+```
+Table for result of GLM
+```{r}
+tb_glm_add_env_bird <- 
+  glm_add_env_bird %>% 
+    dplyr::select(exotic, summary) %>% 
+    unnest(summary) %>% 
+    filter(term != "(Intercept)") %>% 
+    dplyr::mutate(
+      across(where(is.numeric),
+             ~if_else(abs(.) >= 0.001,
+                      round(., digits = 3), .)
+      )) %>% 
+    dplyr::rename(
+      "Explanatory variables" = term,
+      Estimate = estimate,
+      Std.error = std.error,
+      Statistic = statistic) %>% 
+    print()
+```
+Plot for the result of GLM
+```{r}
+theme_set(theme_classic(base_size = 9))
+
+# Year
+p_glm_add_bird_year <- 
+  ggplot() +
+    geom_point(
+      data = df_bird_lost_add,
+      aes(x = year, y = add, color = exotic, shape = exotic)) +
+    geom_smooth(
+      data = glm_add_env_bird %>% 
+        select(exotic, pred) %>% 
+        unnest(pred) %>% 
+        unnest(pred) %>% 
+        filter(exotic == "Native" & group == "year"),
+      aes(x = x, y = predicted, color = exotic),
+      method = "glm", method.args=list(family="binomial"), se = FALSE) +
+    labs(
+      x = "Year",
+      y = "Probability of species immigration"
+      ) +
+      scale_color_simpsons() +
+      theme(
+        strip.placement = "outside",
+        strip.background = element_blank(),
+        strip.text = element_text(size = 9),
+        legend.position = c(0.3, 0.8),
+        legend.title = element_blank()
+        )
+
+# Area
+p_glm_add_bird_area <- 
+  ggplot() +
+    geom_point(
+      data = df_bird_lost_add,
+      aes(x = area/10000, y = add, color = exotic, shape = exotic)) +
+    geom_smooth(
+      data = glm_add_env_bird %>% 
+        select(exotic, pred) %>% 
+        unnest(pred) %>% 
+        unnest(pred) %>% 
+        filter(exotic == "Native" & group == "area"),
+      aes(x/10000, predicted, color = exotic),
+      method = "glm", method.args=list(family="binomial"), se = FALSE) +
+    labs(
+      x = "Area",
+      y = ""
+      ) +
+    scale_color_simpsons() +
+      theme(
+        axis.title.y = element_blank(),
+        strip.placement = "outside",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        legend.position = "none"
+      )
+
+
+# Green rate
+p_glm_add_bird_green <- 
+  ggplot() +
+    geom_point(
+      data = df_bird_lost_add,
+      aes(x = green_rate, y = add, color = exotic, shape = exotic)) +
+      labs(
+        x = "Green rate",
+        y = ""
+      ) +
+      scale_color_simpsons() +
+      theme(
+        axis.title.y = element_blank(),
+        strip.placement = "outside",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        legend.position = "none"
+      )
+
+
+
+# Combine
+p_glm_add_bird_year + p_glm_add_bird_area + p_glm_add_bird_green
+```
+
+```{r eval=FALSE, include=FALSE}
+# For save
+ggsave(
+  p_glm_add_bird_year + p_glm_add_bird_area + p_glm_add_bird_green,
+  file = "output/plot_glm_add_env_bird.png",
+  width = 160, height = 90, units = "mm", dpi = 500)
+```
+
+# Species composition
+```{r}
+df_bird %>% 
+  dplyr::select(site:exotic, -sciname) %>% 
+  pivot_wider(names_from = "species", values_from = value, 
+              values_fill = 0) %>% 
+  filter(exotic == "Native") %>% {
+    
+    dplyr::select(., 1:3) ->> row_bird
+    dplyr::select(., -1:-3) ->> com_bird
+  }
+```
+## Permanova
+```{r}
+permanova_bird <- 
+  adonis2(com_bird ~ row_bird$time, 
+          method = "jac", permutations = 999) %>% 
+  print()
+
+permanova_bird$`Pr(>F)`[1]
+```
+## NMDS
+```{r}
+nmds_bird <-
+  metaMDS(com_bird, distance = "jac", k = 2, trace = FALSE,
+          trymax = 999) 
+
+nmds_bird
+```
+
+Plot for result of nmds
+```{r}
+p_nmds_bird <- 
+  nmds_bird %>% 
+  scores() %>% 
+  pluck(1) %>% 
+  bind_cols(row_bird) %>% 
+  mutate(time = recode_factor(time, "past" = "Past", "now" = "Now")) %>% 
+    ggplot(aes(x = NMDS1, y = NMDS2, color = time, group = time)) +
+      geom_point() +
+      stat_ellipse(
+        aes(group = time, fill = time), 
+        alpha = 0.1,
+        geom = "polygon") +
+  
+    # p-value
+    annotate(
+      "text", x = -1.5, y = 1.2, hjust = 0, size = 2, color = "grey50",
+      label = paste0("Stress value : ", format(nmds_bird$stress, digits = 3))) +
+  
+    # permanova
+    annotate(
+      "text", x = -1.5, y = 1.1, hjust = 0, size = 2, color = "grey50",
+      label = paste0("Permanova : p=", permanova_bird$`Pr(>F)`[1])) +
+    theme(
+      legend.position = c(0.9, 0.9),
+      legend.title = element_blank()
+      )
+
+p_nmds_bird
+```
+```{r eval=FALSE, include=FALSE}
+# For save
+ggsave(
+  p_nmds_bird,
+  file = "output/plot_nmds_bird.png",
+  width = 90, height = 90, units = "mm", dpi = 500)
+```
+
+
+
+
+
+
+
+
+
+
