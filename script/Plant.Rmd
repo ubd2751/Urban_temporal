@@ -55,21 +55,33 @@ plant_sci <-
 
 Loading data
 
-```{r pressure}
+```{r try}
 # Load data
-try_disper1 <- rtry_import("data/try/25827.txt")
-try_disper2 <- rtry_import("data/try/25828.txt")
-try_height1 <- rtry_import("data/try/try_height1.txt")
-try_height2 <- rtry_import("data/try/try_height2.txt")
-try_seed1 <- rtry_import("data/try/try_seed1.txt")
-try_seed2 <- rtry_import("data/try/try_seed2.txt")
-try_sla1 <- rtry_import("data/try/try_SLA1.txt")
-try_sla2 <- rtry_import("data/try/try_SLA2.txt")
-try_la1 <- rtry_import("data/try/try_LA1.txt")
-try_la2 <- rtry_import("data/try/try_LA2.txt")
+try_disper1 <- rtry_import("data/try/25827.txt", showOverview = FALSE)
+try_disper2 <- rtry_import("data/try/25828.txt", showOverview = FALSE)
+try_height1 <- rtry_import("data/try/try_height1.txt", showOverview = FALSE)
+try_height2 <- rtry_import("data/try/try_height2.txt", showOverview = FALSE)
+try_seed1   <- rtry_import("data/try/try_seed1.txt", showOverview = FALSE)
+try_seed2   <- rtry_import("data/try/try_seed2.txt", showOverview = FALSE)
+try_sla1    <- rtry_import("data/try/try_SLA1.txt", showOverview = FALSE)
+try_sla2    <- rtry_import("data/try/try_SLA2.txt", showOverview = FALSE)
+try_la1     <- rtry_import("data/try/try_LA1.txt", showOverview = FALSE)
+try_la2     <- rtry_import("data/try/try_LA2.txt", showOverview = FALSE)
 
 try_la1$OrigUncertaintyStr <- as.numeric(try_la1$OrigUncertaintyStr)
 try_la2$OrigUncertaintyStr <- as.numeric(try_la2$OrigUncertaintyStr)
+
+
+
+# Height
+bind_rows(try_height1, try_height2) %>% 
+  dplyr::filter(str_detect(TraitName, "height")) %>% 
+  
+  distinct(OrigUnitStr)
+  dplyr::group_by(SpeciesName, ObservationID, OriglName, OrigUnitStr) 
+  dplyr::summarise(mean = mean(OrigValueStr))
+
+
 ```
 
 
