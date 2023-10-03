@@ -27,6 +27,16 @@ pacman::p_load(
 #remotes::install_github("traitecoevo/austraits", dependencies = TRUE, upgrade = "ask")
 ```
 
+```{r include=FALSE}
+# For read_csv
+options(
+  readr.num_columns = 0L,
+  readr.show_col_types = FALSE,
+  readr.show_progress = FALSE
+)
+```
+
+
 # Data frame for dispersal type
 
 ## Scientific name
@@ -53,16 +63,143 @@ plant_sci <-
 
 ## Try
 
-Loading data
+Plant height
 
-```{r try}
+```{r try plant height}
+# Load data
+try_height1 <- rtry_import("data/try/try_height1.txt", showOverview = FALSE)
+try_height2 <- rtry_import("data/try/try_height2.txt", showOverview = FALSE)
+
+# data frame
+try_height <-
+  bind_rows(try_height1, try_height2) %>% 
+  dplyr::filter(
+    str_detect(TraitName, "height") & 
+      !is.na(OrigValueStr) &
+      !str_detect(OriglName, "lower")
+    ) %>% 
+  dplyr::mutate(
+    OrigValueStr = as.numeric(OrigValueStr),
+    height = case_when(
+      str_detect(OrigUnitStr, pattern = "cm") ~ OrigValueStr*10,
+      OrigUnitStr == "Cm"   ~ OrigValueStr * 10,
+      OrigUnitStr == "feet" ~ OrigValueStr * 304.8,
+      OrigUnitStr == "m"    ~ OrigValueStr * 1000,
+      OrigUnitStr == "mm"   ~ OrigValueStr
+      )
+    ) %>% 
+  dplyr::filter(!is.na(height) & !str_detect(TraitName, "generative")) %>% 
+  dplyr::group_by(AccSpeciesName) %>% 
+  dplyr::summarise(mean = mean(height)) 
+```
+
+Dispersal type
+```{r try dispersal}
 # Load data
 try_disper1 <- rtry_import("data/try/25827.txt", showOverview = FALSE)
 try_disper2 <- rtry_import("data/try/25828.txt", showOverview = FALSE)
-try_height1 <- rtry_import("data/try/try_height1.txt", showOverview = FALSE)
-try_height2 <- rtry_import("data/try/try_height2.txt", showOverview = FALSE)
+
+# data frame
+try_disper <-
+  bind_rows(try_disper1, try_disper2) %>% 
+  dplyr::filter(
+    str_detect(TraitName, "Dispersal") & 
+      OriglName != "Seed Weight Notes"
+    ) %>% 
+  group_by(SpeciesName) %>% 
+  distinct(OrigValueStr) %>% 
+  dplyr::mutate(data = "try") %>% 
+  dplyr::rename(sciname = SpeciesName, dispersal = OrigValueStr) %>% 
+  left_join(select(plant_sci, species, sciname), by = "sciname") %>% 
+  filter(!is.na(species)) %>% 
+  dplyr::select(species, sciname, dispersal)
+```
+
+
+Seed mass
+```{r}
+# Load data
 try_seed1   <- rtry_import("data/try/try_seed1.txt", showOverview = FALSE)
 try_seed2   <- rtry_import("data/try/try_seed2.txt", showOverview = FALSE)
+
+
+# data frame
+#try_seed <-
+  bind_rows(try_seed1, try_seed2) %>% 
+  dplyr::filter(str_detect(TraitName, "Seed")) %>% 
+  mutate(
+     seed_mass = case_when(
+      str_detect(OrigUnitStr, pattern = "mg") ~ OrigValueStr*1000,
+      str_detect(OrigUnitStr, pattern = "1000") ~ OrigValueStr/1000,
+      str_detect(OrigUnitStr, pattern = "kg") ~ OrigValueStr*1000,
+      OrigUnitStr == "g/100 seeds"   ~ OrigValueStr/100,
+      OrigUnitStr == "mg/1000" ~ OrigValueStr,
+      OrigUnitStr == "g / 1000 seeds" ~ OrigValueStr/1000,
+      OrigUnitStr == "micro gx10"   ~ OrigValueStr
+      )
+  )
+ 
+  distinct(OrigUnitStr)
+
+```
+
+Life form
+```{r}
+try_life <-
+  bind_rows(try_seed1, try_seed2) %>% 
+  dplyr::filter(str_detect(TraitName, "longevity")) %>% 
+  dplyr::mutate(
+    
+    # Annual
+    annual = case_when(
+      str_detect(
+        OrigValueStr, 
+        paste(c("annual","Annual","annuel", "> 1 year",
+                "Biennial","biennial", "<2", "1-2", "1,2","Short"), 
+              collapse = "|")) ~ 1,
+      OriglName == "Annual" ~ 1,
+      OriglName == "Biennial" ~ 1,
+      OriglName == "annper" ~ 1,
+      OriglName == "Plant phenology: Annual" ~ 1,
+      OriglName == "Plant phenology: Biennial" ~ 1,
+      OrigValueStr == "1" ~ 1,
+      OrigValueStr == "2" ~ 1,
+      OrigValueStr == "SL" ~ 1,
+      UnitName == "year" & StdValue < 3 ~ 1),
+    annual = if_else(is.na(annual), 0, 1),
+    
+    # Perennial
+    perennial = case_when(
+      str_detect(
+        OrigValueStr, 
+        paste(c("perennial", "Perennial",">10","-5","5-25","2 - 5",
+                "Moderate","Long"), 
+              collapse = "|")) ~ 1,
+      OriglName == "Plant phenology: Perennial" ~ 1,
+      OriglName == "Perennial" ~ 1,
+      UnitName == "year" & StdValue > 2 & StdValue < 50 & StdValue != 12 ~ 1),
+    perennial = if_else(is.na(perennial), 0, 1),
+    
+    
+    # Tree
+    tree = case_when(
+      str_detect(
+        OrigValueStr, 
+        paste(c("tree", "woody"), 
+              collapse = "|")) ~ 1,
+       UnitName == "year" & StdValue >= 50 ~ 1),
+     tree = if_else(is.na(tree), 0, 1)
+    ) %>%
+  dplyr::group_by(AccSpeciesName) %>% 
+  dplyr::summarise(across(annual:tree, sum)) %>% 
+  pivot_longer(-AccSpeciesName, names_to = "life") %>% 
+  dplyr::group_by(AccSpeciesName) %>% 
+  dplyr::filter(value == max(value))
+```
+
+
+Specific leaf area
+```{r}
 try_sla1    <- rtry_import("data/try/try_SLA1.txt", showOverview = FALSE)
 try_sla2    <- rtry_import("data/try/try_SLA2.txt", showOverview = FALSE)
 try_la1     <- rtry_import("data/try/try_LA1.txt", showOverview = FALSE)
@@ -70,17 +207,6 @@ try_la2     <- rtry_import("data/try/try_LA2.txt", showOverview = FALSE)
 
 try_la1$OrigUncertaintyStr <- as.numeric(try_la1$OrigUncertaintyStr)
 try_la2$OrigUncertaintyStr <- as.numeric(try_la2$OrigUncertaintyStr)
-
-
-
-# Height
-bind_rows(try_height1, try_height2) %>% 
-  dplyr::filter(str_detect(TraitName, "height")) %>% 
-  
-  distinct(OrigUnitStr)
-  dplyr::group_by(SpeciesName, ObservationID, OriglName, OrigUnitStr) 
-  dplyr::summarise(mean = mean(OrigValueStr))
-
 
 ```
 
