@@ -36,32 +36,13 @@ options(
 )
 ```
 
+# Data frame for trait
 
-# Data frame for dispersal type
 
-## Scientific name
 
-Data frame for scientific name
+## Trait (leaf, seed)
 
-```{r}
-plantsci <- read_csv("data/plant_japan_sciname.csv")
-
-# data frame
-plant_sci <- 
-  plantsci %>%  
-  dplyr::select(
-    "common name", 
-    "another name", 
-    "scientific name without author") %>% 
-  dplyr::rename(sciname = "scientific name without author",
-         species = "common name",
-         speciesB = "another name") %>% 
-  distinct(speciesB, .keep_all = TRUE) %>% 
-  arrange(species) %>% 
-  filter(!str_detect(species, "no_named"))
-```
-
-## Try
+### Try
 
 Plant height
 
@@ -90,60 +71,99 @@ try_height <-
     ) %>% 
   dplyr::filter(!is.na(height) & !str_detect(TraitName, "generative")) %>% 
   dplyr::group_by(AccSpeciesName) %>% 
-  dplyr::summarise(mean = mean(height)) 
+  dplyr::summarise(height = mean(height)) 
 ```
 
-Dispersal type
-```{r try dispersal}
-# Load data
-try_disper1 <- rtry_import("data/try/25827.txt", showOverview = FALSE)
-try_disper2 <- rtry_import("data/try/25828.txt", showOverview = FALSE)
+Seed mass & Life form
 
-# data frame
-try_disper <-
-  bind_rows(try_disper1, try_disper2) %>% 
-  dplyr::filter(
-    str_detect(TraitName, "Dispersal") & 
-      OriglName != "Seed Weight Notes"
-    ) %>% 
-  group_by(SpeciesName) %>% 
-  distinct(OrigValueStr) %>% 
-  dplyr::mutate(data = "try") %>% 
-  dplyr::rename(sciname = SpeciesName, dispersal = OrigValueStr) %>% 
-  left_join(select(plant_sci, species, sciname), by = "sciname") %>% 
-  filter(!is.na(species)) %>% 
-  dplyr::select(species, sciname, dispersal)
-```
-
-
-Seed mass
-```{r}
+```{r try seed life}
 # Load data
 try_seed1   <- rtry_import("data/try/try_seed1.txt", showOverview = FALSE)
 try_seed2   <- rtry_import("data/try/try_seed2.txt", showOverview = FALSE)
 
 
-# data frame
-#try_seed <-
+# data frame for seed mass
+try_seed <-
   bind_rows(try_seed1, try_seed2) %>% 
   dplyr::filter(str_detect(TraitName, "Seed")) %>% 
-  mutate(
-     seed_mass = case_when(
-      str_detect(OrigUnitStr, pattern = "mg") ~ OrigValueStr*1000,
-      str_detect(OrigUnitStr, pattern = "1000") ~ OrigValueStr/1000,
-      str_detect(OrigUnitStr, pattern = "kg") ~ OrigValueStr*1000,
-      OrigUnitStr == "g/100 seeds"   ~ OrigValueStr/100,
-      OrigUnitStr == "mg/1000" ~ OrigValueStr,
-      OrigUnitStr == "g / 1000 seeds" ~ OrigValueStr/1000,
-      OrigUnitStr == "micro gx10"   ~ OrigValueStr
-      )
-  )
- 
-  distinct(OrigUnitStr)
-
+  filter(!is.na(StdValue)) %>% 
+  group_by(AccSpeciesName) %>% 
+  summarise(seed_mass = mean(StdValue))
 ```
 
-Life form
+Specific leaf area
+
+```{r}
+try_sla1    <- rtry_import("data/try/try_SLA1.txt", showOverview = FALSE)
+try_sla2    <- rtry_import("data/try/try_SLA2.txt", showOverview = FALSE)
+
+# data frame 
+try_sla <-
+  bind_rows(try_sla1, try_sla1) %>% 
+  dplyr::filter(str_detect(TraitName, "area")) %>% 
+  filter(!is.na(StdValue)) %>% 
+  group_by(AccSpeciesName) %>% 
+  summarise(sla = mean(StdValue))
+```
+
+Leaf area
+
+```{r}
+try_la1     <- rtry_import("data/try/try_LA1.txt", showOverview = FALSE)
+try_la2     <- rtry_import("data/try/try_LA2.txt", showOverview = FALSE)
+
+# data frame 
+try_la <-
+  bind_rows(try_la1, try_la1) %>% 
+  dplyr::filter(str_detect(TraitName, "area")) %>% 
+  filter(!is.na(StdValue)) %>% 
+  group_by(AccSpeciesName) %>% 
+  summarise(la = mean(StdValue))
+```
+
+
+### Austraits
+
+```{r}
+# loading data
+austraits <- load_austraits(version = "3.0.2", path = "data/austraits")
+
+
+# data frame excluding dispersal syndrome data
+aust_trait <- 
+  extract_trait(
+    austraits, 
+    c("leaf_area", "specific_leaf_area", "seed_mass", "plant_height")
+    ) %>%
+  pluck(1) %>% 
+  group_by(taxon_name, trait_name) %>% 
+  summarise(value = mean(value)) %>% 
+  pivot_wider(names_from = trait_name, values_from = value) %>% 
+  rename(
+    sciname = taxon_name,
+    sla = specific_leaf_area,
+    height = plant_height,
+    la = leaf_area 
+  )
+```
+Combine the all of try data
+
+```{r }
+df_leaf <- 
+  try_height %>% 
+  dplyr::left_join(try_seed, by = "AccSpeciesName") %>% 
+  dplyr::left_join(try_sla, by = "AccSpeciesName") %>% 
+  dplyr::left_join(try_la, by = "AccSpeciesName") %>% 
+  rename(sciname = AccSpeciesName) %>% 
+  
+  bind_rows(aust_trait) %>% 
+  dplyr::group_by(sciname) %>% 
+  dplyr::summarise(across(where(is.numeric), mean)) 
+```
+
+## Growth form
+
+### Try
 ```{r}
 try_life <-
   bind_rows(try_seed1, try_seed2) %>% 
@@ -190,151 +210,56 @@ try_life <-
        UnitName == "year" & StdValue >= 50 ~ 1),
      tree = if_else(is.na(tree), 0, 1)
     ) %>%
-  dplyr::group_by(AccSpeciesName) %>% 
-  dplyr::summarise(across(annual:tree, sum)) %>% 
-  pivot_longer(-AccSpeciesName, names_to = "life") %>% 
-  dplyr::group_by(AccSpeciesName) %>% 
-  dplyr::filter(value == max(value))
-```
-
-
-Specific leaf area
-```{r}
-try_sla1    <- rtry_import("data/try/try_SLA1.txt", showOverview = FALSE)
-try_sla2    <- rtry_import("data/try/try_SLA2.txt", showOverview = FALSE)
-try_la1     <- rtry_import("data/try/try_LA1.txt", showOverview = FALSE)
-try_la2     <- rtry_import("data/try/try_LA2.txt", showOverview = FALSE)
-
-try_la1$OrigUncertaintyStr <- as.numeric(try_la1$OrigUncertaintyStr)
-try_la2$OrigUncertaintyStr <- as.numeric(try_la2$OrigUncertaintyStr)
-
-```
-
-
-```{r pressure}
-# Combine
-try_data <- 
-  bind_rows(
-    try_height1, try_height2, 
-    try_seed1, try_seed2,
-    try_sla1, try_sla2, 
-    try_la1, try_la2)
-
-
   
-# Data frame
-#df_try <- 
-  try_data %>% 
-    dplyr::filter(str_detect(
-      TraitName, 
-      paste(c("Leaf area","SLA","height","Seed","longevity"),
-            collapse = "|"))
-      ) %>% 
-    dplyr::select(SpeciesName, TraitName, DataName, OrigValueStr, UnitName)
+  dplyr::group_by(AccSpeciesName) %>% 
+  dplyr::summarise(across(annual:tree, max)) %>% 
+  dplyr::rename(sciname = AccSpeciesName)
 ```
 
 
-```{r pressure}
-try_disper <-
-  bind_rows(try_disper1, try_disper2) %>% 
-  dplyr::filter(
-    str_detect(TraitName, "Dispersal") & OriglName != "Seed Weight Notes"
+### Austrait
+```{r}
+aust_life <-
+  extract_trait(austraits, "life_history") %>% 
+  pluck(1) %>% 
+  dplyr::inner_join(
+    extract_trait(austraits, "plant_growth_form") %>% 
+      pluck(1),
+    by = "taxon_name"
     ) %>% 
-  group_by(SpeciesName) %>% 
-  distinct(OrigValueStr) %>% 
-  dplyr::mutate(data = "try") %>% 
-  dplyr::rename(sciname = SpeciesName, dispersal = OrigValueStr) %>% 
-  left_join(select(plant_sci, species, sciname), by = "sciname") %>% 
-  filter(!is.na(species)) %>% 
-  dplyr::select(species, sciname, dispersal)
-
-head(try_disper)
+  dplyr::select(taxon_name, value.x, value.y) %>% 
+  dplyr::rename(life = value.x, wood = value.y) %>% 
+  dplyr::mutate(
+    annual = if_else(str_detect(life, "annual|biennial"), 1, 0),
+    perennial = if_else(str_detect(life, "perennial"), 1, 0),
+    tree = if_else(str_detect(wood, "tree|shrub"), 1,0),
+    
+    perennial = if_else(tree == 1, 0, perennial),
+    annual = if_else(tree == 1, 0, annual)
+    ) %>% 
+  dplyr::select(-wood, -life) %>% 
+  dplyr::filter(rowSums(across(where(is.numeric))) > 0) %>% 
+  dplyr::group_by(taxon_name) %>% 
+  dplyr::summarise(across(where(is.numeric), max)) %>% 
+  dplyr::rename(sciname = taxon_name)
 ```
 
-## Picture book
-
+Combine those data 
 ```{r}
-# loading data
-pic_data <- read_csv("data/SpeciesList_vegetation.csv")
-
-
-# Data frame
-df_pic <- 
-  pic_data %>% 
-  select(species, dispersal) %>% 
-  filter(!str_detect(dispersal, c("-|不|sheet"))) %>% 
-  dplyr::mutate(species = recode(species,
-                          "トゲヂシャ" = "トゲチシャ",
-                          "ヒナタイノコズチ" = "ヒナタイノコヅチ",
-                          "マハナシ" = "マメナシ",
-                          "マルバイチヤクソウ" = "マルバノイチヤクソウ",
-                          "アケビ" = "ゴヨウアケビ"
-                          )
-         ) %>% 
-  left_join(select(plant_sci, species, sciname), by = "species") %>% 
-  left_join(select(plant_sci, speciesB, sciname), 
-            by = c("species" = "speciesB")) %>% 
-  dplyr::mutate(name = if_else(is.na(sciname.x), sciname.y, sciname.x)) %>% 
-  distinct(species, .keep_all = TRUE) %>% 
-  dplyr::select(species, name, dispersal) %>% 
-  dplyr::rename(sciname = name) %>% 
-  print()
+df_growth <- 
+  dplyr::bind_rows(try_life, aust_life) %>% 
+  dplyr::group_by(sciname) %>% 
+  dplyr::summarise(across(where(is.numeric), max)) 
 ```
 
-## Austraits
 
+
+## Dispersal type 
+Function of divide to dispersal category from words
 ```{r}
-# loading data
-austraits <- load_austraits(version = "3.0.2", path = "data/austraits")
+fun_dispersal <- function(df){
 
-# excluding dispersal syndrome data
-disper_aust <- extract_trait(austraits, "dispersal_syndrome")
-
-
-# Data frame
-df_austrait <- 
-  disper_aust$traits %>% 
-  as_tibble() %>% 
-  dplyr::select(taxon_name, value) %>% 
-  group_by(taxon_name) %>% 
-  distinct(value) %>% 
-  dplyr::rename(sciname = taxon_name, dispersal = value) %>% 
-  left_join(select(plant_sci, species, sciname), by = "sciname") %>% 
-  dplyr::filter(!is.na(species)) %>% 
-  dplyr::select(species, sciname, dispersal)
-
-
-head(df_austrait)
-```
-
-## leda
-
-```{r}
-# loading data
-leda <- read_csv("data/leda.csv")
-
-# Data frame
-df_leda <- 
-  leda %>% 
-  dplyr::select("SBS name", "dispersal type") %>% 
-  dplyr::rename(sciname = "SBS name", dispersal = "dispersal type") %>% 
-  dplyr::filter(dispersal != "") %>%
-  dplyr::mutate(data = "leda") %>% 
-  left_join(select(plant_sci, species, sciname), by = "sciname") %>% 
-  dplyr::filter(!is.na(species)) %>% 
-  dplyr::select(species, sciname, dispersal)
-
-
-head(df_leda)
-```
-
-## Combine all data
-
-Data frame
-
-```{r}
-df_disper <- 
-  bind_rows(df_try, df_pic, df_austrait, df_leda) %>% 
+  df %>% 
     dplyr::mutate(
       wind = if_else(
         str_detect(
@@ -386,75 +311,162 @@ df_disper <-
                 collapse = "|")),
         1, 0)
     ) %>% 
-  dplyr::mutate(animal = if_else(dispersal == "ant", 1, animal),
-         sum = rowSums(across(where(is.numeric)))) %>% 
-  as_tibble()
-
-df_disper
+  dplyr::mutate(
+    animal = if_else(dispersal == "ant", 1, animal),
+    gravity = if_else(dispersal == "Baro", 1, gravity),
+    water = if_else(dispersal == "H", 1, water),
+    wind = if_else(dispersal == "W", 1, wind),
+    animal = if_else(dispersal == "Z", 1, animal),
+    gravity = if_else(dispersal == "G", 1, gravity)
+    ) %>% 
+  as_tibble() 
+}
 ```
+
+
+### Try
+
+```{r try dispersal}
+# Load data
+try_disper1 <- rtry_import("data/try/25827.txt", showOverview = FALSE)
+try_disper2 <- rtry_import("data/try/25828.txt", showOverview = FALSE)
+
+# data frame
+try_disper <-
+  bind_rows(try_disper1, try_disper2) %>% 
+  dplyr::filter(
+    str_detect(TraitName, "Dispersal") & 
+      OriglName != "Seed Weight Notes"
+    ) %>% 
+  group_by(AccSpeciesName) %>% 
+  distinct(DataName, OrigValueStr, OriglName) %>% 
+  dplyr::rename(dispersal = OrigValueStr) %>% 
+  fun_dispersal() %>% 
+  dplyr::mutate(
+    wind = if_else(str_detect(DataName, "wind"), 1, wind),
+    animal = if_else(str_detect(DataName, "animal"), 1, animal),
+    gravity = if_else(str_detect(DataName, "gravity"), 1, gravity),
+    water = if_else(str_detect(DataName, "water"), 1, water),
+    animal = if_else(str_detect(DataName, "biotic"), 1, animal),
+    
+    gravity = if_else(OriglName == "DispMode" & str_detect(dispersal,"G"),
+                      1, gravity),
+    wind = if_else(OriglName == "DispMode" & str_detect(dispersal,"W"),
+                   1, wind),
+    water = if_else(OriglName == "DispMode" & str_detect(dispersal,"H"),
+                    1, water),
+    animal = if_else(
+      OriglName == "DispMode" & 
+        str_detect(dispersal, 
+                   paste(c("Z","P","M","N","O"), collapse = "|")),
+                   1, animal),
+    sum = rowSums(across(where(is.numeric)))
+  ) %>% 
+  filter(sum != 0) %>% 
+  dplyr::rename(sciname = AccSpeciesName) %>% 
+  #left_join(select(plant_sci, species, sciname), by = "sciname") %>% 
+  #filter(!is.na(species)) %>% 
+  dplyr::select(-DataName:-dispersal, -sum) %>% 
+  
+  group_by(sciname) %>% 
+  summarise(across(where(is.numeric), max))
+```
+
+### Picture book
 
 ```{r}
-# Confirmation of dispersal category
-df_disper %>% 
-  filter(sum == 0) %>% 
-  group_by(dispersal) %>% 
-  dplyr::summarise(n = n()) %>% 
-  arrange(-n) 
+# loading data
+pic_data <- read_csv("data/SpeciesList_vegetation.csv")
+
+
+# Data frame
+pic_disper <- 
+  pic_data %>% 
+  dplyr::select(species, dispersal) %>% 
+  dplyr::filter(!str_detect(dispersal, c("-|不|sheet"))) %>% 
+  dplyr::mutate(
+    species = recode(
+      species,
+      "トゲヂシャ" = "トゲチシャ",
+      "ヒナタイノコズチ" = "ヒナタイノコヅチ",
+      "マハナシ" = "マメナシ",
+      "マルバイチヤクソウ" = "マルバノイチヤクソウ",
+      "アケビ" = "ゴヨウアケビ"
+      )
+    ) %>% 
+  dplyr::left_join(select(plant_sci, species, sciname), by = "species") %>% 
+  dplyr::left_join(select(plant_sci, speciesB, sciname), 
+            by = c("species" = "speciesB")) %>% 
+  dplyr::mutate(name = if_else(is.na(sciname.x), sciname.y, sciname.x)) %>% 
+  dplyr::distinct(species, .keep_all = TRUE) %>% 
+  dplyr::select(name, dispersal) %>% 
+  dplyr::rename(sciname = name) %>% 
+  fun_dispersal() %>% 
+  dplyr::select(-dispersal)
 ```
 
-## Adding the Japanese name
-
-adding the japanese name
+### Austraits
 
 ```{r}
-df_disper_spe <- 
-  df_disper %>% 
-    group_by(species, sciname) %>% 
-    dplyr::summarise(across(where(is.numeric), max)) %>% 
-    dplyr::filter(sum != 0) %>% 
-    dplyr::select(-sum) %>% 
-    group_by(species) %>% 
-    dplyr::summarise(across(where(is.numeric), max)) %>% 
-    print()
+# loading data
+austraits <- load_austraits(version = "3.0.2", path = "data/austraits")
+
+
+# dispersal of 
+aust_disper <- 
+  extract_trait(austraits, "dispersal_syndrome") %>% 
+  pluck(1) %>% 
+  rename(dispersal = value) %>% 
+  fun_dispersal() %>% 
+  dplyr::mutate(sum = wind + animal + water + gravity) %>% 
+  dplyr::filter(sum != 0) %>% 
+  dplyr::select(taxon_name, wind:gravity) %>% 
+  dplyr::rename(sciname = taxon_name)
 ```
 
-# Analysis
-
-## Making a data frame
-
-Combine survey and dispersal data Read a survey data
+### leda
 
 ```{r}
-plant <- read_csv("data/df_plant.csv")
+# loading data
+leda <- read_csv("data/leda.csv")
 
-df_plant <- 
-  plant %>% 
-  as_tibble() %>% 
-  mutate(time = if_else(str_detect(site, "過去"), "past", "now")) %>% 
-  select(site, time, everything()) %>% 
-  mutate(site = str_sub(site, end = -3)) %>% 
-  pivot_longer(cols = -c(site, time), names_to = "species") %>% 
-  print()
+# Data frame
+leda_disper <- 
+  leda %>% 
+    dplyr::select("SBS name", "dispersal type") %>% 
+    dplyr::rename(sciname = "SBS name", dispersal = "dispersal type") %>% 
+    dplyr::filter(dispersal != "") %>% 
+    fun_dispersal() %>% 
+    mutate(sum = wind + animal + water + gravity) %>% 
+    filter(sum != 0) %>% 
+    dplyr::select(-dispersal, -sum)
 ```
 
-Read a exotic data
+Combine all data of dispersal type 
 
+```{r}
+df_disper <- 
+  bind_rows(try_disper, df_pic, aust_disper, leda_disper) %>% 
+  dplyr::group_by(sciname) %>% 
+  dplyr::summarise(across(where(is.numeric), max))
+```
+
+## Exotic species
 ```{r}
 YList <- read_csv("data/YList.csv")
 
-ylist <- 
+df_ylist <- 
   YList %>% 
   select(和名,生態)　%>% 
   rename(species = 和名,  exotic = 生態) %>% 
   mutate(exotic = if_else(is.na(exotic), "Native", "Exotic")) %>% 
   filter(species != "") %>% 
   distinct(species, .keep_all = TRUE) %>% 
-  mutate(exotic = if_else(exotic == "","Native", exotic)) %>%
-  print()
+  mutate(exotic = if_else(exotic == "","Native", exotic)) 
 
 
 # including details of exotic species
-df_ylist <- 
+ylist_detail <- 
   YList %>% 
   select(和名, 別名, 学名, 生態)　%>% 
   rename(species = 和名,  other_name = 別名, sciname = 学名, 
@@ -472,34 +484,62 @@ df_ylist <-
     "不明" = "unknown",
     "不明種" = "unknown"
     )) %>% 
-  mutate(exotic = if_else(is.na(exotic), "Native", exotic)) %>%
-  print()
+  mutate(exotic = if_else(is.na(exotic), "Native", exotic))
 ```
 
-Exotic species (Ecology)
+## All trait data
+Data frame for scientific name and japanese name
+
 ```{r}
-exotic_plant <- read_csv("data/plant_exotic.csv") 
+plantsci <- read_csv("data/plant_japan_sciname.csv")
+
+# data frame
+plant_sci <- 
+  plantsci %>%  
+  dplyr::select("common name", "scientific name without author") %>% 
+  dplyr::rename(
+    sciname = "scientific name without author",
+    species = "common name"
+    ) %>% 
+  distinct(species, .keep_all = TRUE) %>% 
+  arrange(species) %>% 
+  filter(!str_detect(species, "no_named"))
+```
+
+Combine 
+```{r}
+df_trait <-
+  plant_sci %>% 
+  dplyr::left_join(df_leaf, by = "sciname") %>% 
+  dplyr::left_join(df_growth, by = "sciname") %>% 
+  dplyr::left_join(df_disper, by = "sciname") %>% 
+  dplyr::left_join(df_ylist, by = "species")
+```
+
+
+
+# Analysis
+
+Load a survey data
+
+```{r}
+plant <- read_csv("data/df_plant.csv")
+
+df_plant <- 
+  plant %>% 
+  mutate(time = if_else(str_detect(site, "過去"), "past", "now")) %>% 
+  select(site, time, everything()) %>% 
+  mutate(site = str_sub(site, end = -3)) %>% 
+  pivot_longer(cols = -c(site, time), names_to = "species") 
 ```
 
 
 Combine the survey, dispersal, and exotic data
 
 ```{r}
-df_plant_disper <- 
+df_plant_trait <- 
   df_plant %>% 
-  
-   # combine dispersal data
-  left_join(df_disper_spe, by = "species") %>% 
-  
-  # combine exotic data
-  left_join(ylist, by = "species") %>% 
-  
-  
-  # combine exotic data (Ecology)
-  #left_join(exotic_plant %>% dplyr::select(-sciname), by = "species") %>% 
-  #mutate(exotic_eco = if_else(is.na(exotic_eco), "Native", "Exotic")) %>% 
-  
-  print()
+  left_join(df_trait, by = "species") 
 ```
 
 Read a environmental data
@@ -511,11 +551,10 @@ env <- read_csv("data/Environment.csv")
 Number of species without dispersal type data
 
 ```{r}
-df_plant_disper %>% 
+df_plant_trait %>% 
   distinct(species, .keep_all = TRUE) %>% 
-  filter(is.na(wind)) %>% 
-  arrange(species) %>% 
-  nrow()
+  filter(is.na(sciname)) %>% 
+  arrange(species) 
 ```
 
 ## Species richness
@@ -524,10 +563,9 @@ Estimate a species richness
 
 ```{r}
 sr_plant <-
-  df_plant_disper %>% 
+  df_plant_trait %>% 
     dplyr::filter(value == 1 & exotic != is.na(exotic)) %>% 
     group_by(site, time, exotic) %>% 
-    #dplyr::mutate(across(wind:gravity, replace_na, 0)) %>% 
     dplyr::summarise(sr = n_distinct(species), .groups = "drop") %>% 
     pivot_wider(names_from = "exotic", values_from = "sr",
                 values_fill = list(sr = 0)) %>% 
@@ -544,8 +582,7 @@ sr_plant <-
       time,
       "past" = "Past",
       "now"  = "Now")
-    ) %>% 
-    print()
+    ) 
 ```
 
 ### Boxplot
@@ -556,7 +593,10 @@ Comparison of species richness
 box_sr_plant <- 
   ggplot(data = sr_plant,
          aes(x = time, y = sr, fill = time)) +
-    geom_boxplot() +
+    geom_boxplot() + 
+    geom_point(color = "grey50", size = 1, alpha = 0.5) +
+    geom_line(aes(group = site), 
+              color = "grey50", size = 0.5, alpha = 0.5) +
     facet_wrap(~exotic, ncol = 3) +
     labs(
       x = "Time",
@@ -587,36 +627,37 @@ Estimate a lost and add of species richness
 
 ```{r}
 plant %>% 
-  as_tibble() %>% 
-  mutate(time = if_else(str_detect(site, "過去"), "past", "now")) %>% 
-  select(site, time, everything()) %>% 
-  mutate(site = str_sub(site, end = -3)) %>% 
+  as_tibble() %>%
+  dplyr::mutate(
+    time = if_else(str_detect(site, "過去"), "past", "now"),
+    site = str_sub(site, end = -3)
+    ) %>% 
+  dplyr::select(site, time, everything()) %>% 
   pivot_longer(cols = -c(site, time), names_to = "species") %>% 
   pivot_wider(names_from = time, values_from = value) %>% 
-  mutate(lost = if_else(past == 1 & now == 0, 1, 0),
-         add  = if_else(past == 0 & now == 1, 1, 0)) %>% 
-  left_join(df_disper_spe, by = "species") %>% 
-  left_join(ylist, by = "species") %>% {
+  dplyr::mutate(lost = if_else(past == 1 & now == 0, 1, 0),
+                add  = if_else(past == 0 & now == 1, 1, 0)) %>% 
+  dplyr::left_join(df_trait, by = "species") %>% {
     
     # lost of species richness
-    filter(., lost == 1) %>% 
-      group_by(site, exotic) %>% 
-      mutate(across(wind:gravity, replace_na, 0)) %>% 
-      summarise(across(wind:gravity, sum)) %>% 
-      filter(!is.na(exotic)) %>% 
+    dplyr::filter(., lost == 1) %>% 
+      dplyr::group_by(site, exotic) %>% 
+      dplyr::mutate(across(wind:gravity, replace_na, 0)) %>% 
+      dplyr::summarise(across(wind:gravity, sum)) %>% 
+      dplyr::filter(!is.na(exotic)) %>% 
       print() ->> sr_lost
     
     # added species richness
-    filter(., add == 1) %>% 
-      group_by(site, exotic) %>% 
-      mutate(across(wind:gravity, replace_na, 0)) %>% 
-      summarise(across(wind:gravity, sum)) %>% 
-      filter(!is.na(exotic)) %>% 
+    dplyr::filter(., add == 1) %>% 
+      dplyr::group_by(site, exotic) %>% 
+      dplyr::mutate(across(wind:gravity, replace_na, 0)) %>% 
+      dplyr::summarise(across(wind:gravity, sum)) %>% 
+      dplyr::filter(!is.na(exotic)) %>% 
       print() ->> sr_add
   }
 ```
 
-### Lost species richness
+### Lost species 
 
 #### Botplot
 
@@ -1096,6 +1137,7 @@ ggsave(
 ```
 
 # Species composition
+
 ```{r}
 comm_plant <- 
   df_plant_disper %>% 
@@ -1134,6 +1176,7 @@ comm_plant <-
 ```
 
 ## Permanova
+
 ```{r}
 df_label_plant <-
   comm_plant %>% 
@@ -1152,6 +1195,7 @@ df_label_plant <-
 ```
 
 Plot for result of nmds
+
 ```{r}
 p_nmds_plant <- 
   comm_plant %>% 
@@ -1190,6 +1234,7 @@ p_nmds_plant <-
 
 p_nmds_plant
 ```
+
 ```{r eval=FALSE, include=FALSE}
 # For save
 ggsave(
