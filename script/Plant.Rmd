@@ -19,7 +19,7 @@ knitr::opts_chunk$set(
 pacman::p_load(
   tidyverse,  # data management
   rtry, austraits,  # trait
-  lme4, lmerTest, broom,  # GLM
+  lme4, lmerTest, broom, multcomp, #GLM
   ggeffects, patchwork, ggsci,  # ggplot
   vegan # composition
   )
@@ -37,8 +37,6 @@ options(
 ```
 
 # Data frame for trait
-
-
 
 ## Trait (leaf, seed)
 
@@ -121,7 +119,6 @@ try_la <-
   summarise(la = mean(StdValue))
 ```
 
-
 ### Austraits
 
 ```{r}
@@ -146,6 +143,7 @@ aust_trait <-
     la = leaf_area 
   )
 ```
+
 Combine the all of try data
 
 ```{r }
@@ -164,6 +162,7 @@ df_leaf <-
 ## Growth form
 
 ### Try
+
 ```{r}
 try_life <-
   bind_rows(try_seed1, try_seed2) %>% 
@@ -216,10 +215,10 @@ try_life <-
   dplyr::rename(sciname = AccSpeciesName)
 ```
 
-
 ### Austrait
+
 ```{r}
-aust_life <-
+#aust_life <-
   extract_trait(austraits, "life_history") %>% 
   pluck(1) %>% 
   dplyr::inner_join(
@@ -244,18 +243,52 @@ aust_life <-
   dplyr::rename(sciname = taxon_name)
 ```
 
-Combine those data 
+### Picture book
+
 ```{r}
-df_growth <- 
-  dplyr::bind_rows(try_life, aust_life) %>% 
-  dplyr::group_by(sciname) %>% 
-  dplyr::summarise(across(where(is.numeric), max)) 
+# loading data
+pic_data <- read_csv("data/SpeciesList_vegetation.csv")
+
+
+# Data frame
+pic_growth <- 
+  pic_data %>% 
+  dplyr::select(species, sciname_ylist, life) %>% 
+  dplyr::filter(!is.na(life) & life != 0 & life != "-") %>% 
+  dplyr::mutate(
+    annual = if_else(str_detect(life, "1年|2年"), 1, 0),
+    perennial = if_else(str_detect(life, "多年"), 1, 0),
+    tree = if_else(str_detect(life, "木|本"), 1,0)
+    ) %>% 
+  dplyr::distinct(sciname_ylist, .keep_all = TRUE) %>% 
+  dplyr::filter(sciname_ylist != "#N/A") %>% 
+  dplyr::rename(sciname = sciname_ylist) %>% 
+  dplyr::select(-life, -species)
 ```
 
+Combine those data
 
+```{r}
+df_growth <-
+  dplyr::bind_rows(try_life, aust_life, pic_growth) %>% 
+  dplyr::group_by(sciname) %>% 
+  dplyr::summarise(across(where(is.numeric), sum)) %>% 
+  
+  # Deciding a growth form at each species
+  pivot_longer(annual:tree) %>% 
+  dplyr::group_by(sciname) %>% 
+  dplyr::mutate(wood = if_else(name == "tree" & value == 1, "Tree", "Forb")) %>%
+  dplyr::filter(value == max(value)) %>% 
+  dplyr::mutate(
+    growth = if_else(wood == "Tree", "tree", name),
+    growth = as.factor(growth)) %>% 
+  dplyr::select(sciname, growth) 
+```
 
-## Dispersal type 
+## Dispersal type
+
 Function of divide to dispersal category from words
+
 ```{r}
 fun_dispersal <- function(df){
 
@@ -323,7 +356,6 @@ fun_dispersal <- function(df){
 }
 ```
 
-
 ### Try
 
 ```{r try dispersal}
@@ -382,7 +414,7 @@ pic_data <- read_csv("data/SpeciesList_vegetation.csv")
 # Data frame
 pic_disper <- 
   pic_data %>% 
-  dplyr::select(species, dispersal) %>% 
+  dplyr::select(species, sciname_ylist, dispersal) %>% 
   dplyr::filter(!str_detect(dispersal, c("-|不|sheet"))) %>% 
   dplyr::mutate(
     species = recode(
@@ -394,14 +426,10 @@ pic_disper <-
       "アケビ" = "ゴヨウアケビ"
       )
     ) %>% 
-  dplyr::left_join(select(plant_sci, species, sciname), by = "species") %>% 
-  dplyr::left_join(select(plant_sci, speciesB, sciname), 
-            by = c("species" = "speciesB")) %>% 
-  dplyr::mutate(name = if_else(is.na(sciname.x), sciname.y, sciname.x)) %>% 
-  dplyr::distinct(species, .keep_all = TRUE) %>% 
-  dplyr::select(name, dispersal) %>% 
-  dplyr::rename(sciname = name) %>% 
+  dplyr::distinct(sciname_ylist, .keep_all = TRUE) %>% 
+  filter(sciname_ylist != "#N/A") %>% 
   fun_dispersal() %>% 
+  dplyr::rename(sciname = sciname_ylist) %>% 
   dplyr::select(-dispersal)
 ```
 
@@ -442,38 +470,41 @@ leda_disper <-
     dplyr::select(-dispersal, -sum)
 ```
 
-Combine all data of dispersal type 
+Combine all data of dispersal type
 
 ```{r}
 df_disper <- 
-  bind_rows(try_disper, df_pic, aust_disper, leda_disper) %>% 
+  bind_rows(try_disper, pic_disper, aust_disper, leda_disper) %>% 
   dplyr::group_by(sciname) %>% 
-  dplyr::summarise(across(where(is.numeric), max))
+  dplyr::summarise(across(where(is.numeric), sum)) %>% 
+  dplyr::mutate(disper = colnames(.)[-1][max.col(across(-sciname))]) %>%
+  dplyr::select(-wind:-gravity)
 ```
 
 ## Exotic species
+
 ```{r}
 YList <- read_csv("data/YList.csv")
 
 df_ylist <- 
   YList %>% 
-  select(和名,生態)　%>% 
-  rename(species = 和名,  exotic = 生態) %>% 
-  mutate(exotic = if_else(is.na(exotic), "Native", "Exotic")) %>% 
-  filter(species != "") %>% 
-  distinct(species, .keep_all = TRUE) %>% 
-  mutate(exotic = if_else(exotic == "","Native", exotic)) 
+  dplyr::select(和名,生態)　%>% 
+  dplyr::rename(species = 和名,  exotic = 生態) %>% 
+  dplyr::mutate(exotic = if_else(is.na(exotic), "Native", "Exotic")) %>% 
+  dplyr::filter(species != "") %>% 
+  dplyr::distinct(species, .keep_all = TRUE) %>% 
+  dplyr::mutate(exotic = if_else(exotic == "","Native", exotic)) 
 
 
 # including details of exotic species
 ylist_detail <- 
   YList %>% 
-  select(和名, 別名, 学名, 生態)　%>% 
-  rename(species = 和名,  other_name = 別名, sciname = 学名, 
+  dplyr::select(和名, 別名, 学名, 生態)　%>% 
+  dplyr::rename(species = 和名,  other_name = 別名, sciname = 学名, 
          exotic = 生態) %>% 
-  filter(species != "") %>% 
-  distinct(species, .keep_all = TRUE) %>% 
-  mutate(exotic = recode(
+  dplyr::filter(species != "") %>% 
+  dplyr::distinct(species, .keep_all = TRUE) %>% 
+  dplyr::mutate(exotic = recode(
     exotic,
     "帰" = "immigration",
     "栽" = "ornament",
@@ -484,10 +515,11 @@ ylist_detail <-
     "不明" = "unknown",
     "不明種" = "unknown"
     )) %>% 
-  mutate(exotic = if_else(is.na(exotic), "Native", exotic))
+  dplyr::mutate(exotic = if_else(is.na(exotic), "Native", exotic))
 ```
 
 ## All trait data
+
 Data frame for scientific name and japanese name
 
 ```{r}
@@ -506,7 +538,8 @@ plant_sci <-
   filter(!str_detect(species, "no_named"))
 ```
 
-Combine 
+Combine
+
 ```{r}
 df_trait <-
   plant_sci %>% 
@@ -516,23 +549,21 @@ df_trait <-
   dplyr::left_join(df_ylist, by = "species")
 ```
 
-
-
 # Analysis
 
-Load a survey data
+Load a survey data (plant and Environment)
 
 ```{r}
 plant <- read_csv("data/df_plant.csv")
+env   <- read_csv("data/Environment.csv")
 
 df_plant <- 
   plant %>% 
-  mutate(time = if_else(str_detect(site, "過去"), "past", "now")) %>% 
-  select(site, time, everything()) %>% 
-  mutate(site = str_sub(site, end = -3)) %>% 
+  dplyr::mutate(time = if_else(str_detect(site, "過去"), "past", "now")) %>% 
+  dplyr::select(site, time, everything()) %>% 
+  dplyr::mutate(site = str_sub(site, end = -3)) %>% 
   pivot_longer(cols = -c(site, time), names_to = "species") 
 ```
-
 
 Combine the survey, dispersal, and exotic data
 
@@ -542,19 +573,12 @@ df_plant_trait <-
   left_join(df_trait, by = "species") 
 ```
 
-Read a environmental data
-
-```{r}
-env <- read_csv("data/Environment.csv")
-```
-
 Number of species without dispersal type data
 
 ```{r}
 df_plant_trait %>% 
   distinct(species, .keep_all = TRUE) %>% 
-  filter(is.na(sciname)) %>% 
-  arrange(species) 
+  filter(is.na(growth))
 ```
 
 ## Species richness
@@ -581,33 +605,59 @@ sr_plant <-
     time = recode_factor(
       time,
       "past" = "Past",
-      "now"  = "Now")
+      "now"  = "Present")
     ) 
 ```
 
-### Boxplot
+Comparison between present and past using Wilcoxon signed rank test
 
-Comparison of species richness
+```{r}
+test_sr_time <-
+  sr_plant %>% 
+  group_by(exotic) %>% 
+  nest() %>% 
+  mutate(
+    wlcx_test = map(data, ~wilcox.test(sr ~ time, data =., paired = TRUE)),
+    wlcx_summary = map(wlcx_test, ~tidy(.))
+    )
+
+
+test_sr_time %>% 
+ unnest(wlcx_summary) %>% 
+ dplyr::select(exotic, p.value)
+```
+
+Boxplot for comparison of species richnes
 
 ```{r}
 box_sr_plant <- 
-  ggplot(data = sr_plant,
-         aes(x = time, y = sr, fill = time)) +
-    geom_boxplot() + 
-    geom_point(color = "grey50", size = 1, alpha = 0.5) +
-    geom_line(aes(group = site), 
-              color = "grey50", size = 0.5, alpha = 0.5) +
+  ggplot(data = sr_plant, aes(x = time, y = sr)) +
+    geom_boxplot(aes(fill = time)) + 
+    geom_point(color = "grey50", size = 0.5, alpha = 0.5) +
+    geom_line(aes(group = interaction(site, exotic)), 
+              color = "grey50", linewidth = 0.3, alpha = 0.5) +
     facet_wrap(~exotic, ncol = 3) +
+    geom_signif(
+      data = data.frame(
+        exotic = factor(
+          c("All species","Native species","Exotic species"),
+          levels = c("All species","Native species","Exotic species"))),
+      aes(y_position = c(850, 800, 200), 
+          xmin = c(1,1,1), xmax = c(2, 2, 2),
+          annotations = c("p = 0.302", "p = 0.148", "p = 0.711")),
+          manual = TRUE, size = 0.2, textsize = 2) +
+    scale_y_continuous(limits = c(0, 900))+
     labs(
       x = "Time",
       y = "Species richness",
-      fill = "Time",
-      title = "Plant"
-    ) +
+      fill = "Time"
+      ) +
     theme_bw(base_size = 8) +
     theme(
       panel.grid = element_blank(),
-      legend.position = "none"
+      legend.position = "none",
+      strip.background = element_blank(),
+      strip.text = element_text(size = 8)
       )
 
 box_sr_plant
@@ -621,52 +671,335 @@ ggsave(
   width = 130, height = 60, units = "mm", dpi = 500)
 ```
 
-## Lost and adding species richness
+## Lost species
 
-Estimate a lost and add of species richness
+Estimate a lost of species
 
 ```{r}
-plant %>% 
-  as_tibble() %>%
-  dplyr::mutate(
-    time = if_else(str_detect(site, "過去"), "past", "now"),
-    site = str_sub(site, end = -3)
-    ) %>% 
-  dplyr::select(site, time, everything()) %>% 
-  pivot_longer(cols = -c(site, time), names_to = "species") %>% 
-  pivot_wider(names_from = time, values_from = value) %>% 
-  dplyr::mutate(lost = if_else(past == 1 & now == 0, 1, 0),
-                add  = if_else(past == 0 & now == 1, 1, 0)) %>% 
-  dplyr::left_join(df_trait, by = "species") %>% {
-    
-    # lost of species richness
-    dplyr::filter(., lost == 1) %>% 
-      dplyr::group_by(site, exotic) %>% 
-      dplyr::mutate(across(wind:gravity, replace_na, 0)) %>% 
-      dplyr::summarise(across(wind:gravity, sum)) %>% 
-      dplyr::filter(!is.na(exotic)) %>% 
-      print() ->> sr_lost
-    
-    # added species richness
-    dplyr::filter(., add == 1) %>% 
-      dplyr::group_by(site, exotic) %>% 
-      dplyr::mutate(across(wind:gravity, replace_na, 0)) %>% 
-      dplyr::summarise(across(wind:gravity, sum)) %>% 
-      dplyr::filter(!is.na(exotic)) %>% 
-      print() ->> sr_add
-  }
+df_plant_lost <-
+  df_plant %>% 
+    pivot_wider(names_from = time, values_from = value) %>% 
+    dplyr::mutate(lost = if_else(past == 1 & now == 0, 1, 0)) %>% 
+    dplyr::left_join(df_trait, by = "species") %>% 
+    dplyr::left_join(env, by = "site") %>% 
+    dplyr::filter(!is.na(exotic)) %>% 
+    dplyr::mutate(across(where(is.character), as.factor))
 ```
 
-### Lost species 
+```{r}
+df_plant_lost %>% 
+  dplyr::filter(lost == 1) %>% 
+  dplyr::group_by(exotic, disper) %>% 
+  dplyr::summarise(n = n_distinct(species)) %>% 
+  na.omit()
+```
 
-#### Botplot
+### GLM
 
-Comparison of lost of species richness
+Relationships between lost species and trait, environmental variables
 
 ```{r}
-box_lostsr <- 
-  sr_lost %>% 
-  pivot_longer(-c(site, exotic)) %>% 
+glm_plant_lost <- 
+  df_plant_lost %>% 
+    filter(past == 1) %>% 
+    dplyr::mutate(across(where(is.character), as.factor)) %>% 
+    group_by(exotic) %>% 
+    nest() %>% 
+    mutate(
+      
+      # GLM
+      fit = map(
+        data, 
+        ~glm(lost ~ year + area + green_rate + growth + disper, 
+             family = "binomial", data = .)),
+      summary_fit = map(fit, ~tidy(.)),
+      
+      
+      # Growth form
+      multi_grow = map(fit, ~glht(., linfct = mcp(growth = "Tukey"))),
+      multi_grow_summary = map(multi_grow, ~tidy(.)),
+      multi_grow_char = map(multi_grow, ~cld(., decreasing = F)),
+      
+      
+      # Dispersal type
+      multi_disper = map(fit, ~glht(., linfct = mcp(disper = "Tukey"))),
+      multi_dipser_summary = map(multi_disper, ~tidy(.)),
+      multi_disper_char = map(multi_disper, ~cld(., decreasing = F)),
+      
+      
+      # Environment
+      pred_year = map(fit, ~ggpredict(., terms = "year")),
+      pred_area = map(fit, ~ggpredict(., terms = "area")),
+      pred_green = map(fit, ~ggpredict(., terms = "green_rate"))
+           
+      ) 
+```
+
+
+```{r}
+glm_plant_lost %>% 
+  unnest(summary_fit) %>% 
+  dplyr::filter(p.value < 0.05)
+```
+
+
+```{r}
+# partial r squared
+df_plant_lost %>% 
+    dplyr::mutate(across(where(is.character), as.factor)) %>% 
+    dplyr::filter(exotic == "Native" & !is.na(growth) & !is.na(disper))  ->> test
+    
+glm(lost ~ area + green_rate + growth + disper, 
+        family = "binomial", data =test) %>%  summary()
+  rsq.partial(adj = TRUE) %>% 
+  pluck(3)
+```
+
+### Plot
+
+#### Growth form
+
+Character of result of GLM of growth form
+
+```{r}
+cha_glm_growth <-
+  bind_rows(
+    tidy(glm_plant_lost$multi_grow_char[[1]]),
+    tidy(glm_plant_lost$multi_grow_char[[2]])
+    ) %>% 
+  mutate(
+    exotic = fct_inorder(rep(c("Native species","Exotic species"), each = 3)),
+    growth = fct_inorder(rep(c("Annual","Perennial","Tree"), 2))
+    )
+```
+
+Plot for result of glm of growth form
+
+```{r}
+box_plant_lost_growth <- 
+  df_plant_lost %>% 
+    group_by(species, growth, exotic) %>% 
+    dplyr::summarise(lost = mean(lost), .groups = "drop") %>% 
+    dplyr::filter(!is.na(growth)) %>% 
+    dplyr:: mutate(
+      exotic = recode_factor(
+        exotic,
+        "Native" = "Native species",
+        "Exotic" = "Exotic species"),
+      growth = recode(
+        growth,
+        "annual" = "Annual",
+        "perennial" = "Perennial",
+        "tree" = "Tree")
+        ) %>% 
+  
+    # plot
+    ggplot() +
+    geom_boxplot(aes(x = growth, y = lost, fill = growth)) + 
+    facet_grid(~exotic) +
+    geom_text(
+      data = cha_glm_growth, 
+      aes(x = growth, y = 1.05, label = letters),
+      position = position_dodge(width = 1), size = 3) +
+    labs(
+      x = "Growth form",
+      y = "Probability of species loss",
+      fill = "Growth form"
+      ) +
+    theme_classic(base_size = 8) +
+    scale_fill_brewer(palette = "Paired") +
+    theme(
+      panel.grid = element_blank(),
+      legend.position = "none",
+      strip.background = element_blank(),
+      strip.text = element_text(size = 8)
+      )
+
+box_plant_lost_growth
+```
+
+```{r eval=FALSE, include=FALSE}
+# For save
+ggsave(
+  box_plant_lost_growth,
+  file = "output/box_plant_growth.png",
+  width = 100, height = 60, units = "mm", dpi = 500)
+```
+
+
+
+#### Dispersal type
+
+Character of result of GLM of dispersal type
+
+```{r}
+cha_glm_lost_disper <-
+  bind_rows(
+    tidy(glm_plant_lost$multi_disper_char[[1]]),
+    tidy(glm_plant_lost$multi_disper_char[[2]])
+    ) %>% 
+  mutate(
+    exotic = fct_inorder(rep(c("Native species","Exotic species"), each = 4)),
+    growth = fct_inorder(rep(c("Animal","Gravity","Water","Wind"), 2))
+    )
+```
+
+Plot for result of glm of growth form
+
+```{r}
+box_plant_lost_disper <- 
+  df_plant_lost %>% 
+    group_by(species, disper, exotic) %>% 
+    dplyr::summarise(lost = mean(lost), .groups = "drop") %>% 
+    dplyr::filter(!is.na(disper)) %>% 
+    dplyr:: mutate(
+      exotic = recode_factor(
+        exotic,
+        "Native" = "Native species",
+        "Exotic" = "Exotic species"),
+      disper = recode(
+        disper,
+        "wind" = "Wind",
+        "animal" = "Animal",
+        "water" = "Water",
+        "gravity" = "Gravity")
+        ) %>% 
+  
+    # plot
+    ggplot() +
+    geom_boxplot(aes(x = disper, y = lost, fill = disper)) + 
+    facet_grid(~exotic) +
+    geom_text(
+      data = cha_glm_lost_disper, 
+      aes(x = growth, y = 1.05, label = letters),
+      position = position_dodge(width = 1), size = 3) +
+    labs(
+      x = "Dispersal type",
+      y = "Probability of species loss"
+      ) +
+    theme_classic(base_size = 8) +
+    scale_fill_brewer(palette = "Paired") +
+    theme(
+      panel.grid = element_blank(),
+      legend.position = "none",
+      strip.background = element_blank(),
+      strip.text = element_text(size = 8)
+      )
+
+box_plant_disper
+```
+
+```{r eval=FALSE, include=FALSE}
+# For save
+ggsave(
+  box_plant_disper,
+  file = "output/box_plant_disper.png",
+  width = 100, height = 60, units = "mm", dpi = 500)
+```
+
+#### Environment
+Plot for the result of GLM of environmental variables
+```{r}
+theme_set(theme_classic(base_size = 9))
+
+
+
+# Year
+p_glm_plant_lost_year <- 
+  ggplot() +
+    geom_point(
+      data = df_plant_lost,
+      aes(x = year, y = lost, color = exotic, shape = exotic)) +
+    geom_smooth(
+      data = glm_plant_lost %>% 
+        unnest(pred_year),
+      aes(x = x, y = predicted, color = exotic),
+      method = "glm", se = FALSE,
+      method.args = list(family = "binomial")) +
+    labs(
+      x = "Year",
+      y = "Probability of species loss"
+      ) +
+      scale_color_simpsons() +
+      theme(
+        strip.placement = "outside",
+        strip.background = element_blank(),
+        strip.text = element_text(size = 9),
+        legend.position = c(0.3, 0.8),
+        legend.title = element_blank()
+        )
+
+# Area
+p_glm_plant_lost_area <- 
+  ggplot() +
+    geom_point(
+      data = df_plant_lost,
+      aes(x = area/10000, y = lost, color = exotic, shape = exotic)) +
+    geom_smooth(
+      data = glm_plant_lost %>% 
+        dplyr::filter(exotic == "Native") %>% 
+        unnest(pred_area),
+      aes(x/10000, predicted, color = exotic),
+      method = "glm", se = FALSE,
+      method.args = list(family = "binomial")) +
+    labs(
+      x = "Area",
+      y = ""
+      ) +
+    scale_color_simpsons() +
+      theme(
+        axis.title.y = element_blank(),
+        strip.placement = "outside",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        legend.position = "none"
+      )
+
+
+# Green rate
+p_glm_plant_lost_green <- 
+  ggplot() +
+    geom_point(
+      data = df_plant_lost,
+      aes(x = green_rate, y = lost, color = exotic, shape = exotic)) +
+    geom_smooth(
+      data = glm_plant_lost %>% 
+        unnest(pred_green),
+      aes(x, predicted, color = exotic),
+      method = "glm", se = FALSE,
+      method.args = list(family = "binomial")) +
+      labs(
+        x = "Green rate",
+        y = ""
+      ) +
+      scale_color_simpsons() +
+      theme(
+        axis.title.y = element_blank(),
+        strip.placement = "outside",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        legend.position = "none"
+      )
+
+
+
+# Combine
+p_glm_plant_lost_year + p_glm_plant_lost_area + p_glm_plant_lost_green
+```
+```{r eval=FALSE, include=FALSE}
+# For save
+ggsave(
+  p_glm_plant_lost_year + p_glm_plant_lost_area + p_glm_plant_lost_green,
+  file = "output/plot_glm_plant_lost_env.png",
+  width = 160, height = 90, units = "mm", dpi = 500)
+```
+
+
+```{r}
+#box_lost_plant_growth <- 
+  df_plant_lost_add %>% 
+  dplyr::filter(lost == 1) %>% 
+  drop_na(growth) 
   mutate(
     exotic = recode_factor(
       exotic, 
@@ -674,16 +1007,23 @@ box_lostsr <-
       "Exotic" = "Exotic species"),
     name = recode(
         name,
-        "wind" = "Wind",
-        "animal" = "Animal",
-        "water" = "Water",
-        "gravity" = "Gravity")
+        "annual" = "Annual",
+        "perennial" = "Perennial",
+        "tree" = "Tree")
         ) %>% 
+  
+  # Plot
   ggplot(aes(x = name, y = value, fill = name)) +
     geom_boxplot() +
     facet_wrap(~exotic, ncol = 2) + 
+    geom_text(
+      data = data_frame(
+        exotic = c(rep(c("Native species","Exotic species"), each = 3)),
+        label = c("a","b","c","a","a","a")),
+      aes(y = 200, label = label)
+    )
     labs(
-      x = "Dispersal type",
+      x = "Growth form",
       y = "Losted species richness"
     ) +
     scale_fill_simpsons() +
@@ -693,15 +1033,7 @@ box_lostsr <-
       panel.grid = element_blank()
     )
 
-box_lostsr
-```
-
-```{r eval=FALSE, include=FALSE}
-# For save
-ggsave(
-  box_lostsr,
-  file = "output/box_lostsr.png",
-  width = 120, height = 70, units = "mm", dpi = 500)
+box_lost_plant_growth
 ```
 
 #### GLM
@@ -709,29 +1041,20 @@ ggsave(
 Relationships between lost of species richness and environment
 
 ```{r}
-sr_lost_nest <- 
-  sr_lost %>% 
-    as_tibble() %>% 
-    left_join(env, by = "site") %>% 
-    mutate(across(year:green_rate, ~scale(.))) %>% 
-    pivot_longer(cols = c("wind","animal", "water","gravity"),
-                 values_to = "sr") %>% 
-    group_by(exotic, name) %>% 
-    nest()
-```
-
-Do a GLM model
-
-```{r}
-glm_sr_lost <- 
-  sr_lost_nest %>% 
+glm_lost_plant_growth <- 
+  df_plant_lost_add %>% 
+    drop_na(growth) %>% 
+    group_by(exotic) %>% 
+    nest() %>% 
     mutate(
-      fit = map(data, ~glm(sr ~ year + area + green_rate, 
-                           family = "poisson", data = .)),
-      summary = map(fit, ~tidy(.))
-      )
-
-glm_sr_lost
+      fit = map(data, ~glm(lost ~ growth, family = "binomial", data = .)),
+      summary_fit = map(fit, ~tidy(.)),
+      
+      multi = map(fit, ~multcomp::glht(., linfct = mcp(growth = "Tukey"))),
+      multi_summary = map(multi, ~tidy(.)),
+      multi_char = map(multi, ~cld(., decreasing = F))
+      ) %>% 
+    ungroup() 
 ```
 
 Table for result of GLM
@@ -1139,10 +1462,10 @@ ggsave(
 # Species composition
 
 ```{r}
-comm_plant <- 
-  df_plant_disper %>% 
-  dplyr::select(site:value, exotic) %>% 
-  pivot_wider(names_from = species, values_from = value, values_fill = 0) %>% 
+#comm_plant <- 
+  df_plant_trait %>% 
+  dplyr::select(site:value, exotic) 
+  pivot_wider(names_from = species, values_from = value, values_fill = 0)  
   na.omit() %>% 
   group_by(exotic) %>% 
   nest() %>% 
