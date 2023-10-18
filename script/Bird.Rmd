@@ -82,18 +82,18 @@ Combine the all data
 df_bird <- 
   bird %>% 
     as_tibble() %>% 
-    mutate(time = if_else(str_detect(site, "過去"), "past", "now")) %>% 
-    select(site, time, everything()) %>% 
-    mutate(site = str_sub(site, end = -3)) %>% 
+    dplyr::mutate(time = if_else(str_detect(site, "過去"), "past", "now")) %>% 
+    dplyr::select(site, time, everything()) %>% 
+    dplyr::mutate(site = str_sub(site, end = -3)) %>% 
     pivot_longer(-c(site, time), names_to = "species") %>% 
-    filter(value == 1) %>% 
+    dplyr::filter(value == 1) %>% 
     
     # combine scientific name + Exotic 
     left_join(
       bird_sciname %>% 
-        select(species, sciname) %>% 
-        mutate(exotic = "Native") %>% 
-        filter(species != "カササギ") %>% 
+        dplyr::select(species, sciname) %>% 
+        dplyr::mutate(exotic = "Native") %>% 
+        dplyr::filter(species != "カササギ") %>% 
         bind_rows(bird_exotic), 
       by = "species") %>% 
     
@@ -111,17 +111,17 @@ df_bird %>%
 
 
 
-#
+# PCA
 df_bird %>% 
   na.omit() %>% 
-  select(where(is.numeric) & -value) %>% 
+  dplyr::select(where(is.numeric) & -value) %>% 
   prcomp(scale = TRUE) %>% 
   biplot()
 ```
 
+# Analysis
 
-
-# Species richness
+## Species richness
 
 Estimate a species richness
 
@@ -133,7 +133,7 @@ sr_bird <-
     filter(exotic != "unknown") %>% 
     pivot_wider(names_from = "exotic", values_from = "sr",
                 values_fill = list(sr = 0)) %>% 
-    mutate(All = Native + Exotic) %>% 
+    dplyr::mutate(All = Native + Exotic) %>% 
     pivot_longer(c(All, Native, Exotic), 
                  values_to = "sr", names_to = "exotic") %>% 
     mutate(
@@ -145,30 +145,67 @@ sr_bird <-
     time = recode_factor(
       time,
       "past" = "Past",
-      "now"  = "Now")
+      "now"  = "Present")
     ) %>% 
+    ungroup() %>% 
     print()
 ```
 
-### Boxplot
+Comparison between present and past using Wilcoxon signed rank test
+
+```{r}
+wlcx_sr_bird_time <-
+  sr_bird %>% 
+  nest_by(exotic) %>% 
+  mutate(
+    wlcx_test = map(data, ~wilcox.test(sr ~ time, data =., paired = TRUE)),
+    wlcx_summary = map(wlcx_test, ~tidy(.))
+    )
+```
+
+P-value of wilcoxon test in the boxplot 
+```{r}
+p_val_wlcx_sr_bird_time <- 
+  wlcx_sr_bird_time %>% 
+   unnest(wlcx_summary) %>% 
+   dplyr::select(exotic, p.value) %>% 
+   dplyr::mutate(
+     char = "p = ",
+     p.value = round(p.value, 3)
+     ) %>% 
+   unite(col = char_pval, char, p.value, remove = F, sep = "") %>% 
+   print()  
+```
+
+
 
 Comparison of species richness
 
 ```{r}
 box_sr_bird <- 
-  ggplot(data = sr_bird,
-         aes(x = time, y = sr, fill = time)) +
-    geom_boxplot() +
-    facet_wrap(~exotic, scales = "free", ncol = 3) +
+  ggplot(data = sr_bird, aes(x = time, y = sr)) +
+    geom_boxplot(aes(fill = time)) + 
+    geom_point(color = "grey50", size = 0.5, alpha = 0.5) +
+    geom_line(aes(group = interaction(site, exotic)), 
+              color = "grey50", linewidth = 0.3, alpha = 0.5) +
+    facet_wrap(~exotic, ncol = 3) +
+    geom_signif(
+      data = p_val_wlcx_sr_bird_time,
+      aes(y_position = c(148, 140, 20), 
+          xmin = c(1, 1, 1), xmax = c(2, 2, 2),
+          annotations = char_pval),
+          size = 0.2, textsize = 2, manual = TRUE) +
+    scale_y_continuous(limits = c(0, 160)) +
     labs(
       x = "Time",
-      y = "Species richness",
-      fill = "Time"
+      y = "Species richness"
     ) +
     theme_bw(base_size = 8) +
     theme(
       panel.grid = element_blank(),
-      legend.position = "none"
+      legend.position = "none",
+      strip.background = element_blank(),
+      strip.text = element_text(size = 8)
       )
 
 box_sr_bird
@@ -184,7 +221,7 @@ ggsave(
 
 
 
-# Lost and add species
+# Lost species
 
 Estimate a lost and added species richness
 
@@ -457,7 +494,7 @@ ggsave(
 ```
 
 
-### Added species
+## Added species
 
 #### Trait
 Relationships between species immigration and trait
@@ -709,8 +746,7 @@ ggsave(
 ```{r}
 df_bird %>% 
   dplyr::select(site:exotic, -sciname) %>% 
-  pivot_wider(names_from = "species", values_from = value, 
-              values_fill = 0) %>% 
+  pivot_wider(names_from = "species", values_from = value, values_fill = 0) %>% 
   filter(exotic == "Native") %>% {
     
     dplyr::select(., 1:3) ->> row_bird
