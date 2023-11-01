@@ -56,22 +56,8 @@ try_height2 <- rtry_import("data/try/try_height2.txt", showOverview = FALSE)
 # data frame
 try_height <-
   bind_rows(try_height1, try_height2) %>% 
-  dplyr::filter(
-    str_detect(TraitName, "height") & 
-      !is.na(OrigValueStr) &
-      !str_detect(OriglName, "lower")
-    ) %>% 
-  dplyr::mutate(
-    OrigValueStr = as.numeric(OrigValueStr),
-    height = case_when(
-      str_detect(OrigUnitStr, pattern = "cm") ~ OrigValueStr*10,
-      OrigUnitStr == "Cm"   ~ OrigValueStr * 10,
-      OrigUnitStr == "feet" ~ OrigValueStr * 304.8,
-      OrigUnitStr == "m"    ~ OrigValueStr * 1000,
-      OrigUnitStr == "mm"   ~ OrigValueStr
-      )
-    ) %>% 
-  dplyr::filter(!is.na(height) & !str_detect(TraitName, "generative")) %>% 
+  dplyr::filter(UnitName == "m" & !is.na(TraitID)) %>% 
+  dplyr::mutate(height = as.numeric(StdValue)) %>% 
   dplyr::group_by(AccSpeciesName) %>% 
   dplyr::summarise(height = mean(height)) 
 ```
@@ -88,9 +74,9 @@ try_seed2   <- rtry_import("data/try/try_seed2.txt", showOverview = FALSE)
 try_seed <-
   bind_rows(try_seed1, try_seed2) %>% 
   dplyr::filter(str_detect(TraitName, "Seed")) %>% 
-  filter(!is.na(StdValue)) %>% 
-  group_by(AccSpeciesName) %>% 
-  summarise(seed_mass = mean(StdValue))
+  dplyr::filter(!is.na(StdValue)) %>% 
+  dplyr::group_by(AccSpeciesName) %>% 
+  dplyr::summarise(seed_mass = mean(StdValue))
 ```
 
 Specific leaf area
@@ -103,9 +89,9 @@ try_sla2    <- rtry_import("data/try/try_SLA2.txt", showOverview = FALSE)
 try_sla <-
   bind_rows(try_sla1, try_sla1) %>% 
   dplyr::filter(str_detect(TraitName, "area")) %>% 
-  filter(!is.na(StdValue)) %>% 
-  group_by(AccSpeciesName) %>% 
-  summarise(sla = mean(StdValue))
+  dplyr::filter(!is.na(StdValue)) %>% 
+  dplyr::group_by(AccSpeciesName) %>% 
+  dplyr::summarise(sla = mean(StdValue))
 ```
 
 Leaf area
@@ -118,9 +104,9 @@ try_la2     <- rtry_import("data/try/try_LA2.txt", showOverview = FALSE)
 try_la <-
   bind_rows(try_la1, try_la1) %>% 
   dplyr::filter(str_detect(TraitName, "area")) %>% 
-  filter(!is.na(StdValue)) %>% 
-  group_by(AccSpeciesName) %>% 
-  summarise(la = mean(StdValue))
+  dplyr::filter(!is.na(StdValue)) %>% 
+  dplyr::group_by(AccSpeciesName) %>% 
+  dplyr::summarise(la = mean(StdValue))
 ```
 
 ### Austraits
@@ -137,15 +123,15 @@ aust_trait <-
     c("leaf_area", "specific_leaf_area", "seed_mass", "plant_height")
     ) %>%
   pluck(1) %>% 
-  group_by(taxon_name, trait_name) %>% 
-  summarise(value = mean(value)) %>% 
+  dplyr::group_by(taxon_name, trait_name) %>% 
+  dplyr::summarise(value = mean(value)) %>% 
   pivot_wider(names_from = trait_name, values_from = value) %>% 
-  rename(
+  dplyr::rename(
     sciname = taxon_name,
     sla = specific_leaf_area,
     height = plant_height,
     la = leaf_area 
-  )
+    )
 ```
 
 Combine the all of try data
@@ -156,7 +142,7 @@ df_leaf <-
   dplyr::left_join(try_seed, by = "AccSpeciesName") %>% 
   dplyr::left_join(try_sla, by = "AccSpeciesName") %>% 
   dplyr::left_join(try_la, by = "AccSpeciesName") %>% 
-  rename(sciname = AccSpeciesName) %>% 
+  dplyr::rename(sciname = AccSpeciesName) %>% 
   
   bind_rows(aust_trait) %>% 
   dplyr::group_by(sciname) %>% 
@@ -222,7 +208,7 @@ try_life <-
 ### Austrait
 
 ```{r}
-#aust_life <-
+aust_life <-
   extract_trait(austraits, "life_history") %>% 
   pluck(1) %>% 
   dplyr::inner_join(
@@ -363,11 +349,10 @@ fun_dispersal <- function(df){
 ### Try
 
 ```{r try dispersal}
-# Load data
 try_disper1 <- rtry_import("data/try/25827.txt", showOverview = FALSE)
 try_disper2 <- rtry_import("data/try/25828.txt", showOverview = FALSE)
 
-# data frame
+
 try_disper <-
   bind_rows(try_disper1, try_disper2) %>% 
   dplyr::filter(
@@ -398,14 +383,14 @@ try_disper <-
                    1, animal),
     sum = rowSums(across(where(is.numeric)))
   ) %>% 
-  filter(sum != 0) %>% 
+  dplyr::filter(sum != 0) %>% 
   dplyr::rename(sciname = AccSpeciesName) %>% 
   #left_join(select(plant_sci, species, sciname), by = "sciname") %>% 
   #filter(!is.na(species)) %>% 
   dplyr::select(-DataName:-dispersal, -sum) %>% 
   
-  group_by(sciname) %>% 
-  summarise(across(where(is.numeric), max))
+  dplyr::group_by(sciname) %>% 
+  dplyr::summarise(across(where(is.numeric), max))
 ```
 
 ### Picture book
@@ -448,7 +433,7 @@ austraits <- load_austraits(version = "3.0.2", path = "data/austraits")
 aust_disper <- 
   extract_trait(austraits, "dispersal_syndrome") %>% 
   pluck(1) %>% 
-  rename(dispersal = value) %>% 
+  dplyr::rename(dispersal = value) %>% 
   fun_dispersal() %>% 
   dplyr::mutate(sum = wind + animal + water + gravity) %>% 
   dplyr::filter(sum != 0) %>% 
@@ -517,7 +502,7 @@ plant_sci <-
     ) %>% 
   distinct(species, .keep_all = TRUE) %>% 
   arrange(species) %>% 
-  filter(!str_detect(species, "no_named"))
+  dplyr::filter(!str_detect(species, "no_named"))
 ```
 
 Combine
@@ -723,7 +708,7 @@ glm_plant_lost <-
 Table for result of GLM
 
 ```{r}
-table_glm_plant_lost <- 
+tb_glm_plant_lost <- 
   glm_plant_lost %>% 
     dplyr::select(exotic, summary_fit) %>% 
     unnest(summary_fit) %>% 
@@ -735,15 +720,21 @@ table_glm_plant_lost <-
                         formatC(p.value, digits = 3, format = "e"))
       ) %>% 
     #arrange(desc(exotic), name) %>% 
-    rename(Nativity = exotic,
-           "Explanatory variables" = term,
-           Estimate = estimate,
-           Std.error = std.error,
-           Statistic = statistic) %>% 
+    dplyr::rename(
+      Nativity = exotic,
+      "Explanatory variables" = term,
+      Estimate = estimate,
+      Std.error = std.error,
+      Statistic = statistic) %>% 
     print()
 ```
 
-```{r}
+```{r eval=FALSE, include=FALSE}
+write.csv(tb_glm_plant_lost, "output/glm_lost_plant.csv")
+```
+
+
+```{r eval=FALSE, include=FALSE}
 # partial r squared
 df_plant_lost %>% 
     dplyr::mutate(across(where(is.character), as.factor)) %>% 
@@ -1071,13 +1062,20 @@ table_glm_plant_colo <-
                         formatC(p.value, digits = 3, format = "e"))
       ) %>% 
     #arrange(desc(exotic), name) %>% 
-    rename(Nativity = exotic,
-           "Explanatory variables" = term,
-           Estimate = estimate,
-           Std.error = std.error,
-           Statistic = statistic) %>% 
+    dplyr::rename(
+      Nativity = exotic,
+      "Explanatory variables" = term,
+      Estimate = estimate,
+      Std.error = std.error,
+       Statistic = statistic) %>% 
     print()
 ```
+```{r eval=FALSE, include=FALSE}
+write.csv(table_glm_plant_colo, "output/glm_colo_plant.csv")
+```
+
+
+
 ### Plot
 #### Growth form
 
@@ -1409,7 +1407,7 @@ p_nmds_plant <-
       theme_bw(base_size = 9) +
       theme(
         panel.grid = element_blank(),
-        legend.position = c(0.1, 0.9),
+        legend.position = c(0.08, 0.9),
         legend.title = element_blank(),
         legend.background = element_blank(),
         strip.background = element_blank()

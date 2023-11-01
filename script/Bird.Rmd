@@ -273,7 +273,9 @@ tb_glm_lost_bird <-
     print()
 ```
 
-
+```{r eval=FALSE, include=FALSE}
+write.csv(tb_glm_lost_bird, "output/glm_lost_bird.csv")
+```
 
 ## Colonized species
 
@@ -305,7 +307,7 @@ summary(glm_bird_colo)
 ```
 Table for result of GLM
 ```{r}
-#tb_glm_bitd_colo <- 
+tb_glm_bitd_colo <- 
   glm_bird_colo %>% 
     tidy() %>% 
     dplyr::filter(term != "(Intercept)") %>% 
@@ -321,6 +323,12 @@ Table for result of GLM
       Std.error = std.error,
       Statistic = statistic) 
 ```
+
+```{r eval=FALSE, include=FALSE}
+write.csv(tb_glm_bitd_colo, "output/glm_colo_bird.csv")
+```
+
+
 
 # Species composition
 ```{r}
@@ -358,7 +366,10 @@ p_nmds_bird <-
   scores() %>% 
   pluck(1) %>% 
   bind_cols(row_bird) %>% 
-  mutate(time = recode_factor(time, "past" = "Past", "now" = "Now")) %>% 
+  dplyr::mutate(time = recode_factor(time, 
+                                     "past" = "Past", 
+                                     "now" = "Present")
+                ) %>% 
     ggplot(aes(x = NMDS1, y = NMDS2, color = time, group = time)) +
       geom_point() +
       stat_ellipse(
@@ -368,18 +379,20 @@ p_nmds_bird <-
   
     # p-value
     annotate(
-      "text", x = -1.5, y = 1.2, hjust = 0, size = 2, color = "grey50",
+      "text", x = 0.6, y = -1.3, hjust = 0, size = 2, color = "grey50",
       label = paste0("Stress value : ", format(nmds_bird$stress, digits = 3))) +
   
     # permanova
     annotate(
-      "text", x = -1.5, y = 1.1, hjust = 0, size = 2, color = "grey50",
+      "text", x = 0.6, y = -1.4, hjust = 0, size = 2, color = "grey50",
       label = paste0("Permanova : p=", permanova_bird$`Pr(>F)`[1])) +
+  
+    theme_classic(base_size = 8) +
     theme(
-      legend.position = c(0.9, 0.9),
+      legend.position = c(0.15, 0.9),
       legend.title = element_blank()
-      )
-
+      ) 
+  
 p_nmds_bird
 ```
 ```{r eval=FALSE, include=FALSE}
