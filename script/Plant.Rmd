@@ -516,6 +516,47 @@ df_trait <-
     dplyr::left_join(df_ylist, by = "species")
 ```
 
+Urbanization rate
+```{r}
+raw_buffer_LU <- read_csv("data/buffer_LU.csv")
+
+urban_rate <- raw_buffer_LU %>% 
+  dplyr::group_by(buffer_size, sitename, DN) %>% 
+  dplyr::summarise(area = sum(area)) %>% 
+  
+  dplyr::group_by(buffer_size, sitename) %>% 
+  dplyr::mutate(
+    total_area = sum(area),
+    rate = area/total_area
+    ) %>% 
+  dplyr::filter(DN == 2) %>% 
+  ungroup() %>% 
+  dplyr::select(-DN, -area, -total_area) %>% 
+  dplyr::rename(site = sitename) %>% 
+  dplyr::mutate(
+    site = recode(
+      site,
+      "fuzisawa1" = "藤沢市1",
+      "fuzisawa2" = "藤沢市2",
+      "fuzisawa3" = "藤沢市3",
+      "hukamisiminnnomori" = "大和市1",
+      "maborisizennkyouikuenn" = "馬堀自然教育園",
+      "nagareyama1" = "流山市1",
+      "nagareyama2" = "流山市2",
+      "nagareyama3" = "流山市3",
+      "niiharusiminnnomori" = "新治市民の森",
+      "oomatisizennkannsatuenn" = "大町公園自然観察園",
+      "sizennkyouikuenn" = "自然教育園",
+      "tamasinnrinnkagakuenn" = "多摩森林科学園",
+      "toukyounougyoudaigakuatugi" = "東京農業大学",
+      "yokohamakokuritudaigaku" = "横浜国立大学",
+      "yokohamasizennkannsatunomori" = "横浜自然観察の森"
+      )
+    ) 
+```
+
+
+
 # Analysis
 
 Load a survey data (plant and Environment)
@@ -560,7 +601,7 @@ sr_plant <-
     dplyr::summarise(sr = n_distinct(species), .groups = "drop") %>% 
     pivot_wider(names_from = "exotic", values_from = "sr",
                 values_fill = list(sr = 0)) %>% 
-    mutate(All = Native + Exotic) %>% 
+    dplyr::mutate(All = Native + Exotic) %>% 
     pivot_longer(c(All, Native, Exotic), 
                  values_to = "sr", names_to = "exotic") %>% 
     mutate(
@@ -575,6 +616,24 @@ sr_plant <-
       "now"  = "Present")
     ) 
 ```
+
+```{r}
+sr_plant %>% 
+  left_join(urban_rate, by = "site") %>% 
+  group_nest(buffer_size) %>% 
+  dplyr::mutate(
+    model = map(data, ~glm(sr ~ rate, family = "poisson", data = .)),
+    AIC = map_dbl(model, ~AIC(.))
+    )
+  
+
+
+
+glm_urban_plant_bf500 <- glm(sr)
+```
+
+
+
 
 Comparison between present and past using Wilcoxon signed rank test
 

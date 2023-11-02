@@ -26,16 +26,20 @@ df_trait_butterfly <- butterfly_trait %>%
   dplyr::filter(!is.na(OvipositionStyle)) %>% 
   rowwise() %>% 
   dplyr::mutate(
-    WS = mean(c(WS_L, WS_U)),
-    FW = mean(c(FW_L, FW_U)),
+    WS = mean(c_across(starts_with("WS")), na.rm =TRUE),
+    FW = mean(c_across(starts_with("WS")), na.rm =TRUE),
     value = 1
     ) %>% 
-  dplyr::select(Species, FlightDuration, Voltinism, WS, FW, value) %>% 
+  dplyr::select(
+    Species, value, FlightDuration, Voltinism, 
+    WS, FW, NumberOfHostplantAccounts
+    ) %>% 
   pivot_wider(
     names_from = Voltinism, 
     values_from = value,
     values_fn = list(value = max)
     ) %>% 
+  dplyr::rename(hostplant = NumberOfHostplantAccounts) %>% 
   dplyr::group_by(Species) %>% 
   dplyr::summarise(across(where(is.numeric), mean)) %>% 
   dplyr::mutate(
@@ -45,7 +49,7 @@ df_trait_butterfly <- butterfly_trait %>%
       U == 1 ~ "Univoltine")
     ) %>% 
   dplyr::select(-M:-U)
-  
+
 
 
 # data frame for analysis
@@ -162,7 +166,7 @@ df_butterfly_lost <- df_butterfly %>%
 
 # GLM
 glm_butterfly_lost <-
-  glm(lost ~ FlightDuration + WS + voltinism + year + area + green_rate, 
+  glm(lost ~ FlightDuration + hostplant + WS + year + area + green_rate, 
       family = "binomial",  data = df_butterfly_lost)
 
 summary(glm_butterfly_lost)
@@ -198,10 +202,10 @@ df_butterfly_colo <- df_butterfly %>%
     names_from = time, 
     values_from = value,
     values_fn = list(value = max)
-  ) %>% 
+    ) %>% 
   dplyr::mutate(colo = if_else(past == 0 & now == 1, 1, 0)) %>% 
   dplyr::left_join(env, by = "site") %>% 
-  dplyr::filter(colo == 1) %>% 
+  dplyr::filter(now == 1) %>% 
   dplyr::mutate(across(where(is.character), as.factor))
 
 
@@ -209,11 +213,10 @@ df_butterfly_colo <- df_butterfly %>%
 
 # GLM
 glm_butterfly_colo <-
-  glm(colo ~ FlightDuration + WS + voltinism + year + area + green_rate, 
+  glm(colo ~ FlightDuration + WS + hostplant + year + area + green_rate, 
       family = "binomial",  data = df_butterfly_colo)
 
 summary(glm_butterfly_colo)
-
 
 
 # Table for result of GLM
