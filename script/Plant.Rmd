@@ -764,6 +764,59 @@ glm_plant_lost <-
       ) 
 ```
 
+Partial r squared
+```{r eval=FALSE, include=FALSE}
+
+# All species
+glm_lost_plant <- 
+  glm(lost ~ year + area + green_rate + growth + disper, 
+      family = "binomial", data = df_plant_lost)
+
+rsq_glm_lost_plant <- rsq.partial(glm_lost_plant, adj = TRUE)
+
+
+
+# Native species
+df_plant_lost_native <-
+  df_plant_lost %>% 
+    dplyr::filter(exotic == "Native" & !is.na(growth) & !is.na(disper)) 
+
+glm_lost_plant_native <- 
+  glm(lost ~ year + area + green_rate + growth + disper, 
+      family = "binomial", data = df_plant_lost_native)
+
+rsq_glm_lost_plant_native <- rsq.partial(glm_lost_plant_native, adj = TRUE)
+
+
+
+
+# Exotic species
+df_plant_lost_exotic <-
+  df_plant_lost %>% 
+    dplyr::filter(exotic == "Exotic" & !is.na(growth) & !is.na(disper)) 
+
+glm_lost_plant_exotic <- 
+  glm(lost ~ year + area + green_rate + growth + disper, 
+      family = "binomial", data = df_plant_lost_exotic)
+
+rsq_glm_lost_plant_exotic <- rsq.partial(glm_lost_plant_exotic, adj = TRUE)
+
+
+df_rsq_glm_lost_plant <- 
+  bind_rows(
+    rsq_glm_lost_plant[2:3],
+    rsq_glm_lost_plant_native[2:3],
+    rsq_glm_lost_plant_exotic[2:3]
+    ) %>% 
+    dplyr::mutate(Nativity = rep(c("All", "Native","Exotic"), each = 5)) %>% 
+  print()
+```
+```{r eval=FALSE, include=FALSE}
+write.csv(df_rsq_glm_lost_plant, "output/rsq_glm_lost_plant.csv")
+```
+
+
+
 Table for result of GLM
 
 ```{r}
@@ -773,12 +826,11 @@ tb_glm_plant_lost <-
     unnest(summary_fit) %>% 
     dplyr::filter(term != "(Intercept)") %>% 
     dplyr::mutate(
-      across(estimate:statistic, ~round(., digits = 3)),
-      p.value = if_else(p.value > 0.001, 
-                        formatC(p.value, digits = 3, format = "fg"),
-                        formatC(p.value, digits = 3, format = "e"))
-      ) %>% 
-    #arrange(desc(exotic), name) %>% 
+      across(where(is.numeric),
+             ~ifelse(. > -0.001 & . < 0.001,
+                      formatC(., digits = 3, format = "e"),
+                      formatC(., digits = 3, format = "fg"))
+      )) %>% 
     dplyr::rename(
       Nativity = exotic,
       "Explanatory variables" = term,
@@ -793,17 +845,6 @@ write.csv(tb_glm_plant_lost, "output/glm_lost_plant.csv")
 ```
 
 
-```{r eval=FALSE, include=FALSE}
-# partial r squared
-df_plant_lost %>% 
-    dplyr::mutate(across(where(is.character), as.factor)) %>% 
-    dplyr::filter(exotic == "Native" & !is.na(growth) & !is.na(disper))  ->> test
-    
-glm(lost ~ area + green_rate + growth + disper, 
-        family = "binomial", data =test) %>%  summary()
-  rsq.partial(adj = TRUE) %>% 
-  pluck(3)
-```
 
 ### Plot
 
@@ -1084,6 +1125,8 @@ glm_plant_colo <-
         data, 
         ~glm(colo ~ year + area + green_rate + growth + disper, 
              family = "binomial", data = .)),
+      
+      # summary of GLM
       summary_fit = map(fit, ~tidy(.)),
       
       
@@ -1106,21 +1149,22 @@ glm_plant_colo <-
       ) 
 ```
 
+
+
 Table for result of GLM
 
 ```{r}
-table_glm_plant_colo <- 
+tb_glm_plant_colo <- 
   glm_plant_colo %>% 
     dplyr::select(exotic, summary_fit) %>% 
     unnest(summary_fit) %>% 
     dplyr::filter(term != "(Intercept)") %>% 
     dplyr::mutate(
-      across(estimate:statistic, ~round(., digits = 3)),
-      p.value = if_else(p.value > 0.001, 
-                        formatC(p.value, digits = 3, format = "fg"),
-                        formatC(p.value, digits = 3, format = "e"))
-      ) %>% 
-    #arrange(desc(exotic), name) %>% 
+      across(where(is.numeric),
+             ~ifelse(. > -0.001 & . < 0.001,
+                      formatC(., digits = 3, format = "e"),
+                      formatC(., digits = 3, format = "fg"))
+      )) %>% 
     dplyr::rename(
       Nativity = exotic,
       "Explanatory variables" = term,
@@ -1130,10 +1174,60 @@ table_glm_plant_colo <-
     print()
 ```
 ```{r eval=FALSE, include=FALSE}
-write.csv(table_glm_plant_colo, "output/glm_colo_plant.csv")
+write.csv(tb_glm_plant_colo, "output/glm_colo_plant.csv")
 ```
 
 
+Partial r squared
+```{r }
+
+# All species
+glm_plant_colo <- 
+  glm(colo ~ year + area + green_rate + growth + disper, 
+      family = "binomial", data = df_plant_colo)
+
+rsq_glm_plant_lost <- rsq.partial(glm_plant_colo, adj = TRUE)
+
+
+
+# Native species
+df_plant_colo_native <-
+  df_plant_colo %>% 
+    dplyr::filter(exotic == "Native" & !is.na(growth) & !is.na(disper)) 
+
+glm_plant_colo_native <- 
+  glm(colo ~ year + area + green_rate + growth + disper, 
+      family = "binomial", data = df_plant_colo_native)
+
+rsq_glm_plant_colo_native <- rsq.partial(glm_plant_colo_native, adj = TRUE)
+
+
+
+
+# Exotic species
+df_plant_colo_exotic <-
+  df_plant_colo %>% 
+    dplyr::filter(exotic == "Exotic" & !is.na(growth) & !is.na(disper)) 
+
+glm_plant_colo_exotic <- 
+  glm(colo ~ year + area + green_rate + growth + disper, 
+      family = "binomial", data = df_plant_colo_exotic)
+
+rsq_glm_plant_colo_exotic <- rsq.partial(glm_plant_colo_exotic, adj = TRUE)
+
+
+df_rsq_glm_plant_colo <- 
+  bind_rows(
+    rsq_glm_plant_lost[2:3],
+    rsq_glm_plant_colo_native[2:3],
+    rsq_glm_plant_colo_exotic[2:3]
+    ) %>% 
+    dplyr::mutate(Nativity = rep(c("All", "Native","Exotic"), each = 5)) %>% 
+  print()
+```
+```{r eval=FALSE, include=FALSE}
+write.csv(df_rsq_glm_plant_colo, "output/rsq_glm_plant_colo.csv")
+```
 
 ### Plot
 #### Growth form

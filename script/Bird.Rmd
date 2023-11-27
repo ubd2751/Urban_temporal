@@ -236,7 +236,7 @@ df_bird_lost <-
       ) %>% 
     left_join(env, by = "site") %>% 
     dplyr::filter(exotic != "unknown" & past == 1) %>% 
-    dplyr::mutate(exotic = factor(exotic, levels = c("Native", "Exotic"))) 
+    dplyr::mutate(exotic = factor(exotic, levels = c("Native", "Exotic")))
 ```
 
 
@@ -245,14 +245,23 @@ Relationships between lost of species and trait
 
 GLM
 ```{r}
-glm_bird_lost <- 
+df_bird_lost_native <-
   df_bird_lost %>% 
-    dplyr::filter(exotic == "Native") %>% 
+    dplyr::filter(exotic == "Native")
+  
+glm_bird_lost <- 
     glm(lost ~ Mass + Beak.Length_Culmen + HWI + year + area + green_rate, 
-        family = "binomial",  data = .)
+        family = "binomial",  data = df_bird_lost_native)
 
 summary(glm_bird_lost)
 ```
+
+Partial r squared for GLM
+```{r}
+rsq_glm_plant_lost <- rsq.partial(glm_bird_lost, adj = TRUE) %>% 
+  print()
+```
+
 Table for result of GLM
 ```{r}
 tb_glm_lost_bird <- 
@@ -260,10 +269,11 @@ tb_glm_lost_bird <-
     tidy() %>% 
     dplyr::filter(term != "(Intercept)") %>% 
     dplyr::mutate(
+      bind_rows(rsq_glm_plant_lost[3]),
       across(where(is.numeric),
-             ~if_else(. < 0.001,
-                      formatC(., digits = 3, format = "e"),
-                      formatC(., digits = 3, format = "fg"))
+             ~ifelse(. > -0.001 & . < 0.001,
+                     formatC(., digits = 3, format = "e"),
+                     formatC(., digits = 3, format = "fg"))
       )) %>% 
     dplyr::rename(
       "Explanatory variables" = term,
@@ -276,6 +286,12 @@ tb_glm_lost_bird <-
 ```{r eval=FALSE, include=FALSE}
 write.csv(tb_glm_lost_bird, "output/glm_lost_bird.csv")
 ```
+
+
+
+
+
+
 
 ## Colonized species
 
@@ -291,20 +307,34 @@ df_bird_colo <-
       ) %>% 
     left_join(env, by = "site") %>% 
     dplyr::filter(exotic != "unknown" & now == 1) %>% 
-    dplyr::mutate(exotic = factor(exotic, levels = c("Native", "Exotic"))) 
+    dplyr::mutate(
+      exotic = factor(exotic, levels = c("Native", "Exotic")),
+      
+      # scaling for explanatory variables
+      across(c(Beak.Length_Culmen:Mass, year:green_rate), scale)
+      ) 
 ```
 
 
 ### GLM
 ```{r}
-glm_bird_colo <- 
+df_bird_colo_native <- 
   df_bird_colo %>% 
-    dplyr::filter(exotic == "Native") %>% 
-    glm(colo ~ Mass + Beak.Length_Culmen + HWI + year + area + green_rate,
-        family = "binomial",  data = .)
+    dplyr::filter(exotic == "Native")
+
+glm_bird_colo <- 
+  glm(colo ~ Mass + Beak.Length_Culmen + HWI + year + area + green_rate,
+      family = "binomial",  data = df_bird_colo_native)
 
 summary(glm_bird_colo)
 ```
+Partial r squared for GLM
+```{r}
+rsq_glm_plant_colo <- 
+  rsq.partial(glm_bird_colo, adj = TRUE) %>% 
+  print()
+```
+
 Table for result of GLM
 ```{r}
 tb_glm_bitd_colo <- 
@@ -312,8 +342,9 @@ tb_glm_bitd_colo <-
     tidy() %>% 
     dplyr::filter(term != "(Intercept)") %>% 
     dplyr::mutate(
+      bind_rows(rsq_glm_plant_colo[3]),
       across(where(is.numeric),
-             ~if_else(. < 0.001,
+              ~ifelse(. > -0.001 & . < 0.001,
                       formatC(., digits = 3, format = "e"),
                       formatC(., digits = 3, format = "fg"))
       )) %>% 
@@ -321,7 +352,8 @@ tb_glm_bitd_colo <-
       "Explanatory variables" = term,
       Estimate = estimate,
       Std.error = std.error,
-      Statistic = statistic) 
+      Statistic = statistic) %>% 
+  print()
 ```
 
 ```{r eval=FALSE, include=FALSE}

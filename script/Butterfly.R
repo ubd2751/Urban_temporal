@@ -150,16 +150,17 @@ box_sr_butterfly
 # Lost species ----------------------------------------------------------------
 
 # data frame
-df_butterfly_lost <- df_butterfly %>% 
-  pivot_wider(
-    names_from = time, 
-    values_from = value,
-    values_fn = list(value = max)
-    ) %>% 
-  dplyr::mutate(lost = if_else(past == 1 & now == 0, 1, 0)) %>% 
-  dplyr::left_join(env, by = "site") %>% 
-  dplyr::filter(past == 1) %>% 
-  dplyr::mutate(across(where(is.character), as.factor))
+df_butterfly_lost <- 
+  df_butterfly %>% 
+    pivot_wider(
+      names_from = time, 
+      values_from = value,
+      values_fn = list(value = max)
+      ) %>% 
+    dplyr::mutate(lost = if_else(past == 1 & now == 0, 1, 0)) %>% 
+    dplyr::left_join(env, by = "site") %>% 
+    dplyr::filter(past == 1) %>% 
+    dplyr::mutate(across(where(is.character), as.factor)) 
 
 
 
@@ -173,21 +174,28 @@ summary(glm_butterfly_lost)
 
 
 
+# Partial r squared for GLM
+rsq_glm_butterfly_lost <- rsq.partial(glm_butterfly_lost, adj = TRUE) 
+
+
 # Table for result of GLM
-tb_glm_butterfly_lost <- glm_butterfly_lost %>% 
-  tidy() %>% 
-  dplyr::filter(term != "(Intercept)") %>% 
-  dplyr::mutate(
-    across(where(is.numeric),
-           ~if_else(. < 0.001,
-                    formatC(., digits = 3, format = "e"),
-                    formatC(., digits = 3, format = "fg"))
-    )) %>% 
-  dplyr::rename(
-    "Explanatory variables" = term,
-    Estimate = estimate,
-    Std.error = std.error,
-    Statistic = statistic) 
+tb_glm_butterfly_lost <- 
+  glm_butterfly_lost %>% 
+    tidy() %>% 
+    dplyr::filter(term != "(Intercept)") %>% 
+    dplyr::mutate(
+      bind_rows(rsq_glm_butterfly_lost[3]),
+      across(where(is.numeric),
+             ~ifelse(. > -0.001 & . < 0.001,
+                      formatC(., digits = 3, format = "e"),
+                      formatC(., digits = 3, format = "fg"))
+      )) %>% 
+    dplyr::rename(
+      "Explanatory variables" = term,
+      Estimate = estimate,
+      Std.error = std.error,
+      Statistic = statistic
+      ) 
 
 # write.csv(tb_glm_butterfly_lost, "output/glm_lost_butterfly.csv")
 
@@ -197,16 +205,22 @@ tb_glm_butterfly_lost <- glm_butterfly_lost %>%
 # Colonized species -----------------------------------------------------------
 
 # data frame
-df_butterfly_colo <- df_butterfly %>% 
-  pivot_wider(
-    names_from = time, 
-    values_from = value,
-    values_fn = list(value = max)
-    ) %>% 
-  dplyr::mutate(colo = if_else(past == 0 & now == 1, 1, 0)) %>% 
-  dplyr::left_join(env, by = "site") %>% 
-  dplyr::filter(now == 1) %>% 
-  dplyr::mutate(across(where(is.character), as.factor))
+df_butterfly_colo <- 
+  df_butterfly %>% 
+    pivot_wider(
+      names_from = time, 
+      values_from = value,
+      values_fn = list(value = max)
+      ) %>% 
+    dplyr::mutate(colo = if_else(past == 0 & now == 1, 1, 0)) %>% 
+    dplyr::left_join(env, by = "site") %>% 
+    dplyr::filter(now == 1) %>% 
+    dplyr::mutate(
+      across(where(is.character), as.factor),
+      
+      # scaling for explanatory variables
+      across(c(FlightDuration:hostplant, year:green_rate), scale)
+      )
 
 
 
@@ -219,21 +233,30 @@ glm_butterfly_colo <-
 summary(glm_butterfly_colo)
 
 
+# Partial r squared for GLM
+rsq_glm_butterfly_colo <- rsq.partial(glm_butterfly_colo, adj = TRUE) 
+
+
 # Table for result of GLM
-tb_glm_butterfly_colo <- glm_butterfly_colo %>% 
-  tidy() %>% 
-  dplyr::filter(term != "(Intercept)") %>% 
-  dplyr::mutate(
-    across(where(is.numeric),
-           ~if_else(. < 0.001,
-                    formatC(., digits = 3, format = "e"),
-                    formatC(., digits = 3, format = "fg"))
-    )) %>% 
-  dplyr::rename(
-    "Explanatory variables" = term,
-    Estimate = estimate,
-    Std.error = std.error,
-    Statistic = statistic) 
+tb_glm_butterfly_colo <- 
+  glm_butterfly_colo %>% 
+    tidy() %>% 
+    dplyr::filter(term != "(Intercept)") %>% 
+    dplyr::mutate(
+      bind_rows(rsq_glm_butterfly_colo[3]),
+      
+      # round
+      across(where(is.numeric),
+             ~ifelse(. > -0.001 & . < 0.001,
+                     formatC(., digits = 3, format = "e"),
+                     formatC(., digits = 3, format = "fg")))
+      ) %>% 
+    dplyr::rename(
+      "Explanatory variables" = term,
+      Estimate = estimate,
+      Std.error = std.error,
+      Statistic = statistic
+      ) 
 
 # write.csv(tb_glm_butterfly_colo, "output/glm_colo_butterfly.csv")
 
