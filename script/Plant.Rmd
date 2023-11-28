@@ -617,22 +617,6 @@ sr_plant <-
     ) 
 ```
 
-```{r}
-sr_plant %>% 
-  left_join(urban_rate, by = "site") %>% 
-  group_nest(buffer_size) %>% 
-  dplyr::mutate(
-    model = map(data, ~glm(sr ~ rate, family = "poisson", data = .)),
-    AIC = map_dbl(model, ~AIC(.))
-    )
-  
-
-
-
-glm_urban_plant_bf500 <- glm(sr)
-```
-
-
 
 
 Comparison between present and past using Wilcoxon signed rank test
@@ -643,7 +627,7 @@ wlcx_sr_time <-
   group_by(exotic) %>% 
   nest() %>% 
   mutate(
-    wlcx_test = map(data, ~wilcox.test(sr ~ time, data =., paired = TRUE)),
+    wlcx_test = map(data, ~wilcox.exact(sr ~ time, data =., paired = TRUE)),
     wlcx_summary = map(wlcx_test, ~tidy(.))
     )
 ```
@@ -681,7 +665,8 @@ box_sr_plant <-
     labs(
       x = "Time",
       y = "Species richness",
-      fill = "Time"
+      fill = "Time",
+      title = "Plant"
       ) +
     theme_bw(base_size = 8) +
     theme(
@@ -1472,12 +1457,21 @@ ggsave(
 # Species composition
 
 ```{r}
-comp_plant <- 
+df_comp_plant <- 
   df_plant_trait %>% 
   dplyr::select(site:value, exotic) %>% 
   dplyr::filter(!is.na(exotic)) %>% 
-  pivot_wider(names_from = species, values_from = value, values_fill = 0) %>% 
-  nest_by(exotic) %>%  
+  pivot_wider(names_from = species, values_from = value, values_fill = 0)  
+
+
+# data-frame for all, native, and exotic species
+comp_plant <- df_comp_plant %>% 
+  dplyr::group_by(site, time) %>% 
+  dplyr::summarise(across(where(is.numeric), sum), .groups = "drop") %>% 
+  dplyr::mutate(exotic = "All species") %>% 
+  dplyr::select(site, time, exotic, everything()) %>% 
+  dplyr::bind_rows(df_comp_plant) %>% 
+  nest_by(exotic) %>% 
   ungroup() %>% 
   dplyr::mutate(
     comp = map(data, 
@@ -1504,8 +1498,7 @@ comp_plant <-
     exotic = recode_factor(exotic, 
                            "Native" = "Native species",
                            "Exotic" = "Exotic species")
-    ) %>% 
-  print()
+    ) 
 ```
 
 ## Permanova
@@ -1534,9 +1527,13 @@ p_nmds_plant <-
   comp_plant %>% 
   dplyr::select(exotic, nmds_score) %>% 
   unnest(nmds_score) %>% 
-  mutate(
-    time = rep(c("Past", "Present"), 30),
-    time = factor(time, levels = c("Past", "Present"))) %>% 
+  dplyr::mutate(
+    time = rep(c("Past", "Present"), 45),
+    time = factor(time, levels = c("Past", "Present")),
+    exotic = factor(
+      exotic, 
+      levels = c("All species", "Native species", "Exotic species"))
+    ) %>% 
   
     ggplot(aes(x = NMDS1, y = NMDS2, color = time)) +
       geom_point() +
@@ -1544,6 +1541,7 @@ p_nmds_plant <-
         aes(group = time, fill = time), 
         alpha = 0.1,
         geom = "polygon") +
+  
       facet_wrap(.~exotic) +
       
   

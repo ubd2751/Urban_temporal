@@ -130,11 +130,11 @@ sr_bird <-
   df_bird %>% 
     group_by(site, time, exotic) %>% 
     dplyr::summarise(sr = n_distinct(species)) %>% 
-    filter(exotic != "unknown") %>% 
+    dplyr::filter(exotic != "unknown") %>% 
     pivot_wider(names_from = "exotic", values_from = "sr",
                 values_fill = list(sr = 0)) %>% 
     dplyr::mutate(All = Native + Exotic) %>% 
-    pivot_longer(c(All, Native, Exotic), 
+    pivot_longer(cols = c(All, Native, Exotic), 
                  values_to = "sr", names_to = "exotic") %>% 
     dplyr::mutate(
       exotic = recode_factor(
@@ -142,13 +142,13 @@ sr_bird <-
         "All" = "All species",
         "Native" = "Native species",
         "Exotic" = "Exotic species"),
-      time = recode_factor(
+      time = case_match(
         time,
-        "past" = "Past",
-        "now"  = "Present")
+        "past" ~ "Past",
+        "now"  ~ "Present")
       ) %>% 
-    ungroup() %>% 
-    print()
+   ungroup() %>% 
+   print()
 ```
 
 Comparison between present and past using Wilcoxon signed rank test
@@ -158,12 +158,12 @@ wlcx_sr_bird_time <-
   sr_bird %>% 
   nest_by(exotic) %>% 
   mutate(
-    wlcx_test = map(data, ~wilcox.test(sr ~ time, data =., paired = TRUE)),
+    wlcx_test = map(data, ~wilcox.exact(sr ~ time, data =., paired = TRUE)),
     wlcx_summary = map(wlcx_test, ~tidy(.))
     )
 ```
 
-P-value of wilcoxon test in the boxplot 
+P-value of wilcoxon test for the boxplot 
 ```{r}
 p_val_wlcx_sr_bird_time <- 
   wlcx_sr_bird_time %>% 
@@ -173,13 +173,12 @@ p_val_wlcx_sr_bird_time <-
      char = "p = ",
      p.value = round(p.value, 3)
      ) %>% 
-   unite(col = char_pval, char, p.value, remove = F, sep = "") %>% 
-   print()  
+   unite(col = char_pval, char, p.value, remove = F, sep = "") 
 ```
 
 
 
-Comparison of species richness
+Comparison of species richness with boxplot
 
 ```{r}
 box_sr_bird <- 
@@ -197,6 +196,7 @@ box_sr_bird <-
           size = 0.2, textsize = 2, manual = TRUE) +
     scale_y_continuous(limits = c(0, 160)) +
     labs(
+      title = "Bird",
       x = "Time",
       y = "Species richness"
     ) +
@@ -364,44 +364,83 @@ write.csv(tb_glm_bitd_colo, "output/glm_colo_bird.csv")
 
 # Species composition
 ```{r}
-df_bird %>% 
+df_comp_bird <- df_bird %>% 
   dplyr::select(site:exotic, -sciname) %>% 
-  pivot_wider(names_from = "species", values_from = value, values_fill = 0) %>% 
-  filter(exotic == "Native") %>% {
+  pivot_wider(names_from = "species", values_from = value, values_fill = 0) 
+
+comp_bird <- df_comp_bird %>% 
+  dplyr::group_by(site, time) %>% 
+  dplyr::summarise(across(where(is.numeric), sum), .groups = "drop") %>% 
+  dplyr::mutate(exotic = "All") %>% 
+  dplyr::select(site, time, exotic, everything()) %>% 
+  dplyr::bind_rows(df_comp_bird) %>% 
+  nest_by(exotic) %>%
+  dplyr::filter(exotic != "unknown" & exotic != "Exotic") %>% 
+  ungroup() %>% 
+  dplyr::mutate(
+    comp = map(
+      data,
+      ~ dplyr::select(., where(~ is.numeric(.) && sum(.) != 0))),
     
-    dplyr::select(., 1:3) ->> row_bird
-    dplyr::select(., -1:-3) ->> com_bird
-  }
+    # NMDS
+    nmds = map(
+      comp, 
+      ~ metaMDS(., dist = "jac", k = 2, trace = F, trymax = 999)),
+    
+    # NMDS axis score
+    nmds_score = map(nmds, ~scores(.) %>% pluck(1) %>% as.data.frame()),
+    
+    # NMDS stress value
+    nmds_stress = map_dbl(nmds, ~.$stress),
+    
+    # permanova
+    permanova = map(data, ~adonis2(.[,-1:-2] ~ .$time, method = "jac")),
+    
+    
+    # p-value from permanova
+    pval = map(permanova, ~as.tibble(.) %>% dplyr::select("Pr(>F)")),
+    
+    
+    exotic = recode_factor(
+      exotic, 
+      "All" = "All species",
+      "Native" = "Native species")
+    
+    ) 
 ```
+
 ## Permanova
-```{r}
-permanova_bird <- 
-  adonis2(com_bird ~ row_bird$time, 
-          method = "jac", permutations = 999) %>% 
-  print()
 
-permanova_bird$`Pr(>F)`[1]
-```
-## NMDS
 ```{r}
-nmds_bird <-
-  metaMDS(com_bird, distance = "jac", k = 2, trace = FALSE,
-          trymax = 999) 
-
-nmds_bird
+df_label_bird <-
+  comp_bird %>% 
+    dplyr::select(exotic, nmds_stress, pval) %>% 
+    unnest(pval) %>% 
+    na.omit() %>% 
+    dplyr::mutate(
+      across(where(is.numeric), ~round(., digits = 3)),
+      time = "Past",
+      stressvalue = "Stress value:",
+      permanova_cha = "Permanova: p = "
+      ) %>% 
+    unite(stress, stressvalue, nmds_stress, remove = F, sep = "") %>% 
+    unite(permanova, permanova_cha, "Pr(>F)", remove = F, sep = "") %>% 
+    print()
 ```
+
+
 
 Plot for result of nmds
 ```{r}
 p_nmds_bird <- 
-  nmds_bird %>% 
-  scores() %>% 
-  pluck(1) %>% 
-  bind_cols(row_bird) %>% 
-  dplyr::mutate(time = recode_factor(time, 
-                                     "past" = "Past", 
-                                     "now" = "Present")
-                ) %>% 
+  comp_bird %>% 
+  dplyr::select(exotic, nmds_score) %>% 
+  unnest(nmds_score) %>% 
+  dplyr::mutate(
+    time = rep(c("Past", "Present"), 14),
+    time = factor(time, levels = c("Past", "Present"))
+    ) %>% 
+  
     ggplot(aes(x = NMDS1, y = NMDS2, color = time, group = time)) +
       geom_point() +
       stat_ellipse(
@@ -409,20 +448,22 @@ p_nmds_bird <-
         alpha = 0.1,
         geom = "polygon") +
   
+    facet_wrap(. ~ exotic) +
+  
+  
     # p-value
-    annotate(
-      "text", x = 0.6, y = -1.3, hjust = 0, size = 2, color = "grey50",
-      label = paste0("Stress value : ", format(nmds_bird$stress, digits = 3))) +
+    geom_text(
+      data = df_label_bird, aes(label = stress), 
+      x = -1.5, y = 1.2, hjust = 0, size = 2, color = "grey50") +
   
     # permanova
-    annotate(
-      "text", x = 0.6, y = -1.4, hjust = 0, size = 2, color = "grey50",
-      label = paste0("Permanova : p=", permanova_bird$`Pr(>F)`[1])) +
+    geom_text(
+      data = df_label_bird, aes(label = permanova), 
+      x = -1.5, y = 1.1, hjust = 0, size = 2, color = "grey50") +
   
-    theme_classic(base_size = 8) +
+    theme_bw(base_size = 9) +
     theme(
-      legend.position = c(0.15, 0.9),
-      legend.title = element_blank()
+      legend.position = "none"
       ) 
   
 p_nmds_bird

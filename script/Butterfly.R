@@ -82,11 +82,11 @@ df_butterfly <-
       "Everes argiades" = "Cupido argiades",
       "Cynthia cardui" = "Vanessa cardui",
       "Narathura bazalus" = "Narathura bazalus",
-      "Damora sagana" = "Argynnis sagana"
-      )
+      "Damora sagana" = "Argynnis sagana"),
+    
+    exotic = ifelse(species == "アカボシゴマダラ", "Exotic","Native")
     ) %>% 
-  left_join(df_trait_butterfly, by = c("sci_name" = "Species")) %>% 
-  dplyr::filter(species != "アカボシゴマダラ")
+  left_join(df_trait_butterfly, by = c("sci_name" = "Species")) 
   
 
 
@@ -99,17 +99,62 @@ df_butterfly <-
 # Species richness------------------------------------------------------------
 sr_butterfly <-
   df_butterfly %>% 
-  dplyr::filter(value == 1) %>% 
-  group_by(site, time) %>% 
-  dplyr::summarise(sr = n_distinct(species), .groups = "drop") 
+    dplyr::filter(value == 1) %>% 
+    group_by(site, time, exotic) %>% 
+    dplyr::summarise(sr = n_distinct(species), .groups = "drop") %>% 
+  
+    pivot_wider(
+      names_from = "exotic", 
+      values_from = "sr",
+      values_fill = list(sr = 0)
+      ) %>% 
+    dplyr::mutate(All = Native + Exotic) %>% 
+  
+    pivot_longer(
+      cols = c(All, Native, Exotic), 
+      values_to = "sr", 
+      names_to = "exotic"
+      ) %>% 
+    dplyr::mutate(
+      exotic = recode_factor(
+        exotic, 
+        "All" = "All species",
+        "Native" = "Native species",
+        "Exotic" = "Exotic species"),
+      time = recode_factor(
+        time,
+        "past" = "Past",
+        "now"  = "Present")
+    ) %>% 
+    dplyr::filter(exotic != "Exotic species") %>% 
+    ungroup() 
   
 
 
 ## Wilcoxon test for comparing the species richness
-wlcx_sr_time_butterfly <-
-  wilcox.test(sr ~ time, data = sr_butterfly, paired = TRUE) 
+wlcx_sr_butterfly_time <-
+  sr_butterfly %>%
+    nest_by(exotic) %>% 
+    mutate(
+      wlcx_test = map(data, ~wilcox.exact(sr ~ time, data =., paired = TRUE)),
+      wlcx_summary = map(wlcx_test, ~tidy(.))
+      )
 
 
+
+## P-value of wilcoxon test for the boxplot 
+p_val_wlcx_sr_butterfly <- 
+  wlcx_sr_butterfly_time %>% 
+    unnest(wlcx_summary) %>% 
+    dplyr::select(exotic, p.value) %>% 
+    dplyr::mutate(
+      char = "p = ",
+      p.value = round(p.value, 3)
+      ) %>% 
+    unite(col = char_pval, char, p.value, remove = F, sep = "") 
+
+
+ 
 
 ## Boxplot
 box_sr_butterfly <- 
@@ -119,18 +164,24 @@ box_sr_butterfly <-
   geom_line(
     aes(group = interaction(site)), 
     color = "grey50", linewidth = 0.3, alpha = 0.5) +
+  facet_wrap(~exotic, ncol = 2) +
   geom_signif(
-    y_position = 58, xmin = 1, xmax = 2, annotations = "p = 0.297",
-    size = 0.2, textsize = 2
-    ) +
+    data = p_val_wlcx_sr_butterfly,
+    aes(y_position = c(58, 57), 
+        xmin = c(1, 1), xmax = c(2, 2),
+        annotations = char_pval),
+    size = 0.2, textsize = 2, manual = TRUE) +
   labs(
+    title = "Butterfly",
     x = "Time",
     y = "Species richness"
     ) +
   theme_bw(base_size = 8) +
   theme(
     panel.grid = element_blank(),
-    legend.position = "none"
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_blank()
     )
 
 box_sr_butterfly
@@ -267,27 +318,72 @@ tb_glm_butterfly_colo <-
 # Species composition  --------------------------------------------------------
 
 # data frame for species composition
-comp_butterfly <- df_butterfly %>% 
+df_comp_butterfly <- df_butterfly %>% 
   dplyr::filter(value == 1) %>% 
-  dplyr::select(site, time, species, value) %>% 
+  dplyr::select(site, time, exotic, species, value) %>% 
   pivot_wider(
     names_from = species, 
     values_from = value,
     values_fill = 0
-    ) 
+    )
 
-
-
-# NMDS
-nmds_butterfly <- comp_butterfly %>% 
-  dplyr::select(-site, -time) %>% 
-  vegan::metaMDS(trace = FALSE)
   
 
 
-# Permanova
-permanova_butterfly <- 
-  adonis2(comp_butterfly[,-1:-2] ~ comp_butterfly$time, method = "jac")
+comp_butterfly <- df_comp_butterfly %>% 
+  dplyr::group_by(site, time) %>% 
+  dplyr::summarise(across(where(is.numeric), sum), .groups = "drop") %>% 
+  dplyr::mutate(exotic = "All") %>% 
+  dplyr::select(site, time, exotic, everything()) %>% 
+  dplyr::bind_rows(df_comp_butterfly) %>% 
+  nest_by(exotic) %>%
+  dplyr::filter(exotic != "Exotic") %>% 
+  ungroup() %>% 
+  dplyr::mutate(
+    comp = map(
+      data,
+      ~ dplyr::select(., where(~ is.numeric(.) && sum(.) != 0))),
+    
+    # NMDS
+    nmds = map(
+      comp, 
+      ~ metaMDS(., dist = "jac", k = 2, trace = F, trymax = 999)),
+    
+    # NMDS axis score
+    nmds_score = map(nmds, ~scores(.) %>% pluck(1) %>% as.data.frame()),
+    
+    # NMDS stress value
+    nmds_stress = map_dbl(nmds, ~.$stress),
+    
+    # permanova
+    permanova = map(data, ~adonis2(.[,-1:-2] ~ .$time, method = "jac")),
+    
+    
+    # p-value from permanova
+    pval = map(permanova, ~as.tibble(.) %>% dplyr::select("Pr(>F)")),
+    
+    
+    exotic = recode_factor(
+      exotic, 
+      "All" = "All species",
+      "Native" = "Native species")
+    
+  ) 
+
+
+df_label_butterfly <-
+  comp_butterfly %>% 
+  dplyr::select(exotic, nmds_stress, pval) %>% 
+  unnest(pval) %>% 
+  na.omit() %>% 
+  dplyr::mutate(
+    across(where(is.numeric), ~round(., digits = 3)),
+    time = "Past",
+    stressvalue = "Stress value:",
+    permanova_cha = "Permanova: p = "
+  ) %>% 
+  unite(stress, stressvalue, nmds_stress, remove = F, sep = "") %>% 
+  unite(permanova, permanova_cha, "Pr(>F)", remove = F, sep = "") 
 
 
 
@@ -295,44 +391,50 @@ permanova_butterfly <-
 
 # Plot of NMDS
 p_nmds_butterfly <- 
-  nmds_butterfly %>% 
-  scores() %>% 
-  pluck(1) %>% 
-  as_tibble() %>% 
-  dplyr::mutate(time = rep(c("Past", "Present"), 7)) %>% 
-  
-  ggplot(aes(x = NMDS1, y = NMDS2, color = time)) +
-  geom_point() +
-  stat_ellipse(
-    aes(group = time, fill = time), 
-    alpha = 0.1,
-    geom = "polygon") +
-  
-  # Stress value
-  annotate(
-    "text", x = 0.35, y = -0.45, size = 2, color = "grey50", hjust = 0,
-    label = paste0("Stress value : ", 
-                   format(nmds_butterfly$stress, digits = 3)
-                   )
-    ) +
-  
-  # permanova
-  annotate(
-    "text", x = 0.35, y = -0.5, hjust = 0, size = 2, color = "grey50",
-    label = paste0("Permanova : p=", 
-                   permanova_butterfly$`Pr(>F)`[1])
-    ) +
-  
-  theme_classic(base_size = 9) +
-  theme(
-    panel.grid = element_blank(),
-    legend.position = c(0.13, 0.9),
-    legend.title = element_blank(),
-    legend.background = element_blank(),
-    strip.background = element_blank()
-    )
+  comp_butterfly %>% 
+    dplyr::select(exotic, nmds_score) %>% 
+    unnest(nmds_score) %>% 
+    dplyr::mutate(
+      time = rep(c("Past", "Present"), 14),
+      time = factor(time, levels = c("Past", "Present"))
+    ) %>% 
+    
+    ggplot(aes(x = NMDS1, y = NMDS2, color = time)) +
+    geom_point() +
+    stat_ellipse(
+      aes(group = time, fill = time), 
+      alpha = 0.1,
+      geom = "polygon") +
+    
+    facet_wrap(. ~ exotic) +
+    
+    # Stress value
+    geom_text(
+      data = df_label_butterfly, aes(label = stress), 
+      x = 0.35, y = -0.45, size = 2, color = "grey50", hjust = 0) +
+    
+    # permanova
+    geom_text(
+      data = df_label_bird, aes(label = permanova), 
+      x = 0.35, y = -0.5, hjust = 0, size = 2, color = "grey50") +
+    
+    theme_bw(base_size = 9) +
+    theme(
+      panel.grid = element_blank(),
+      legend.position = c(0.13, 0.9),
+      legend.title = element_blank(),
+      legend.background = element_blank(),
+      strip.background = element_blank()
+      )
 
 
+p_nmds_butterfly
+
+  
+  
+  
+  
+  
 # save
 ggsave(p_nmds_butterfly, file = "output/plot_nmds_butterfly.png", width = 90, height = 90, units = "mm", dpi = 500)
 
