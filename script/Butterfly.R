@@ -56,9 +56,10 @@ df_trait_butterfly <- butterfly_trait %>%
 butterfly <- read_csv("data/butterfly/df_butterfly.csv")
 butterfly_sci <- read_csv("data/butterfly/butterfly_sciname.csv")
 
-df_butterfly <- 
-  butterfly %>% 
-  dplyr::mutate(time = if_else(str_detect(site, "過去"), "past", "now")) %>% 
+df_butterfly <- butterfly %>% 
+  dplyr::mutate(
+    time = if_else(str_detect(site, "過去"), "past", "now"),
+    ) %>% 
   dplyr::select(site, time, everything()) %>% 
   pivot_longer(cols = -c(site, time), names_to = "species") %>% 
   dplyr::mutate(

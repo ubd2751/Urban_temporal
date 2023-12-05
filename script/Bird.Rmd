@@ -86,7 +86,7 @@ df_bird <-
     dplyr::select(site, time, everything()) %>% 
     dplyr::mutate(site = str_sub(site, end = -3)) %>% 
     pivot_longer(-c(site, time), names_to = "species") %>% 
-    dplyr::filter(value == 1) %>% 
+    #dplyr::filter(value == 1) %>% 
     
     # combine scientific name + Exotic 
     left_join(
@@ -126,12 +126,12 @@ df_bird %>%
 Estimate a species richness
 
 ```{r}
-sr_bird <-
-  df_bird %>% 
-    group_by(site, time, exotic) %>% 
-    dplyr::summarise(sr = n_distinct(species)) %>% 
-    dplyr::filter(exotic != "unknown") %>% 
-    pivot_wider(names_from = "exotic", values_from = "sr",
+sr_bird <- df_bird %>% 
+  dplyr::filter(value == 1) 
+  group_by(site, time, exotic) %>% 
+  dplyr::summarise(sr = n_distinct(species)) %>% 
+  dplyr::filter(exotic != "unknown") %>% 
+  pivot_wider(names_from = "exotic", values_from = "sr",
                 values_fill = list(sr = 0)) %>% 
     dplyr::mutate(All = Native + Exotic) %>% 
     pivot_longer(cols = c(All, Native, Exotic), 
