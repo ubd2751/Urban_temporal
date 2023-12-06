@@ -68,7 +68,7 @@ df_bird <- bird %>%
   dplyr::select(site, time, everything()) %>% 
   pivot_longer(-c(site, time), names_to = "species") %>% 
   
-  # combine scientific name + Exotic 
+  # combining the scientific name + Exotic 
   left_join(
     bird_sciname %>% 
       dplyr::select(species, sciname) %>% 
@@ -76,9 +76,9 @@ df_bird <- bird %>%
       dplyr::filter(species != "カササギ") %>% 
       bind_rows(bird_exotic), 
     by = "species") %>% 
+  dplyr::filter(exotic != "unknown") %>% 
   
-  
-  # combine trait data
+  # combining the trait data
   left_join(df_bird_trait, by = "sciname") 
 
 

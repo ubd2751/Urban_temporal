@@ -361,7 +361,7 @@ comp_butterfly <- df_comp_butterfly %>%
     
     
     # p-value from permanova
-    pval = map(permanova, ~as.tibble(.) %>% dplyr::select("Pr(>F)")),
+    pval = map(permanova, ~as_tibble(.) %>% dplyr::select("Pr(>F)")),
     
     
     exotic = recode_factor(
@@ -416,7 +416,7 @@ p_nmds_butterfly <-
     
     # permanova
     geom_text(
-      data = df_label_bird, aes(label = permanova), 
+      data = df_label_butterfly, aes(label = permanova), 
       x = 0.35, y = -0.5, hjust = 0, size = 2, color = "grey50") +
     
     theme_bw(base_size = 9) +
