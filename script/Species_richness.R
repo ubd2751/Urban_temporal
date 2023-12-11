@@ -6,7 +6,42 @@
 
 
 
-# Species richness--------------
+## Estimate a species richness--------------
+
+# Function of estimation of species richness
+est_sr <- function(x) {
+  x %>% 
+    dplyr::filter(value == 1 & (exotic == "Native" | exotic == "Exotic")) %>% 
+    dplyr::group_by(site, time, exotic) %>% 
+    dplyr::summarise(sr = n_distinct(species), .groups = "drop") %>% 
+    pivot_wider(
+      names_from = "exotic", 
+      values_from = "sr",
+      values_fill = list(sr = 0)
+      ) %>% 
+    dplyr::mutate(All = Native + Exotic) %>% 
+    pivot_longer(c(All, Native, Exotic), 
+                 values_to = "sr", names_to = "exotic") %>% 
+    dplyr::mutate(
+      exotic = recode_factor(
+        exotic, 
+        "All" = "All species",
+        "Native" = "Native species",
+        "Exotic" = "Exotic species"),
+      time = recode_factor(
+        time,
+        "past" = "Past",
+        "now"  = "Present")
+      ) 
+}
+
+# Estimate a species richnnes
+sr_plant <- est_sr(df_plant)
+sr_bird <- est_sr(df_bird)
+sr_butterfly <- est_sr(df_butterfly)
+
+
+## Boxplot --------
 
 # Plant
 box_sr_plant <- 
@@ -22,13 +57,13 @@ box_sr_plant <-
     geom_line(aes(group = interaction(exotic, site)), 
               color = "grey50", linewidth = 0.2, alpha = 0.3) +
     facet_wrap(~exotic, ncol = 3) +
-    geom_signif(
-      data = p_val_wlcx_sr_time,
-      aes(y_position = c(870, 830, 220), 
-          xmin = c(1, 1, 1), xmax = c(2, 2, 2),
-          annotations = char_pval),
-      size = 0.1, textsize = 1.3, manual = TRUE, 
-      tip_length = 0.05, vjust = -0.5) +
+    #geom_signif(
+    #  data = p_val_wlcx_sr_time,
+    #  aes(y_position = c(870, 830, 220), 
+    #      xmin = c(1, 1, 1), xmax = c(2, 2, 2),
+    #      annotations = char_pval),
+    #  size = 0.1, textsize = 1.3, manual = TRUE, 
+    #  tip_length = 0.05, vjust = -0.5) +
     scale_y_continuous(limits = c(0, 950)) +
     labs(
       x = "Time",

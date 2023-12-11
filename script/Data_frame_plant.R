@@ -438,9 +438,6 @@ df_trait <- plant_sci %>%
 
 
 
-
-
-
 # Data frame for plant ---------------
 plant <- read_csv("data/df_plant.csv")
 env   <- read_csv("data/Environment.csv")
@@ -455,5 +452,15 @@ df_plant <- plant %>%
   
   # Combine the growth, dispersal, and exotic data
   dplyr::inner_join(df_trait, by = "species") 
+
+
+
+
+
+# Species richness at each time 
+df_plant %>% 
+  dplyr::filter(value == 1 & (exotic == "Native" | exotic == "Exotic")) %>% 
+  dplyr::group_by(time, exotic) %>% 
+  dplyr::summarise(sr = n_distinct(species), .groups = "drop") 
 
 

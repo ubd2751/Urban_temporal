@@ -82,3 +82,11 @@ df_bird <- bird %>%
   left_join(df_bird_trait, by = "sciname") 
 
 
+
+
+# Species richness at each time 
+df_bird %>% 
+  dplyr::filter(value == 1 & (exotic == "Native" | exotic == "Exotic")) %>% 
+  dplyr::group_by(time, exotic) %>% 
+  dplyr::summarise(sr = n_distinct(species), .groups = "drop") 
+
