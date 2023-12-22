@@ -1,5 +1,5 @@
 
-# Species Composition #######################################################
+# NMDS #######################################################
 
 
 # data frame for species composition
@@ -93,9 +93,8 @@ comp_butterfly <- est_nmds_prmnv(df_comp_butterfly)
 
 
 
-# Plot -----------------------------------------------------------------------
+## Plot -----------------------------------------------------------------------
 
-## Labels --------------
 ## Label for stress value and p-value of permanova
 label_nmds <- function(x) {
   
@@ -116,8 +115,6 @@ label_nmds <- function(x) {
 label_nmds_plant <- label_nmds(comp_plant)
 label_nmds_bird <- label_nmds(comp_bird)
 label_nmds_butterfly <- label_nmds(comp_butterfly)
-
-
 
 
 
@@ -291,6 +288,11 @@ p_nmds <-
 # Save
 ggsave(p_nmds, file = "output/nmds_time.png", 
        width = 120, height = 125, units = "mm", dpi = 500)
+
+
+
+
+
 
 
 

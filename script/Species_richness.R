@@ -2,13 +2,9 @@
 # Species richness ============================================================
 
 
-
-
-
-
 ## Estimate a species richness--------------
 
-# Function of estimation of species richness
+# Function of estimation for species richness
 est_sr <- function(x) {
   x %>% 
     dplyr::filter(value == 1 & (exotic == "Native" | exotic == "Exotic")) %>% 
@@ -35,15 +31,17 @@ est_sr <- function(x) {
       ) 
 }
 
-# Estimate a species richnnes
+# Estimate a species richnesss
 sr_plant <- est_sr(df_plant)
 sr_bird <- est_sr(df_bird)
 sr_butterfly <- est_sr(df_butterfly)
 
 
-## Boxplot --------
 
-# Plant
+
+# Boxplot ------------------------------------------------------------------
+
+## Plant
 box_sr_plant <- 
   ggplot(data = sr_plant, aes(x = time, y = sr)) +
     geom_boxplot(
@@ -187,5 +185,83 @@ ggsave(box_sr_time, file = "output/box_sr_time.png",
 
 
 
+
+
+
+
+## GLM ------------------------------------------------------------
+
+# Plant
+glm_sr_plant <- sr_plant %>% 
+  left_join(env, by = "site") %>% 
+  pivot_wider(names_from = time, values_from = sr) %>% 
+  dplyr::mutate(sr = Past - Present) %>% 
+  
+  group_nest(exotic) %>% 
+  dplyr::mutate(
+    model = map(data, ~ glm(sr ~ year + area + green_rate, data = .)),
+    summary = map(model, ~tidy(.))
+    )
+
+
+# Bird
+glm_sr_bird <- sr_bird %>% 
+  left_join(env, by = "site") %>% 
+  pivot_wider(names_from = time, values_from = sr) %>% 
+  dplyr::mutate(sr = Past - Present) %>% 
+  
+  group_nest(exotic) %>% 
+  dplyr::mutate(
+    model = map(data, ~ glm(sr ~ year + area + green_rate, data = .)),
+    summary = map(model, ~tidy(.))
+  )
+
+
+# Butterfly
+glm_sr_butterfly <- sr_butterfly %>% 
+  left_join(env, by = "site") %>% 
+  pivot_wider(names_from = time, values_from = sr) %>% 
+  dplyr::mutate(sr = Past - Present) %>% 
+  
+  group_nest(exotic) %>% 
+  dplyr::mutate(
+    model = map(data, ~ glm(sr ~ year + area + green_rate, data = .)),
+    summary = map(model, ~tidy(.))
+  )
+
+
+
+### Table for GLM
+tidy_table <- function(x) {
+  
+  x %>% 
+    dplyr::select(-data, -model) %>% 
+    tidyr::unnest(summary) %>% 
+    dplyr::filter(term != "(Intercept)") %>% 
+    dplyr::mutate(
+      # round
+      across(where(is.numeric),
+             ~ if_else(abs(.) <= 0.001,
+                     formatC(., digits = 3, format = "e"),
+                     formatC(., digits = 3, format = "fg")))
+    ) %>% 
+    dplyr::rename(
+      "Explanatory variables" = term,
+      Estimate = estimate,
+      Std.error = std.error,
+      Statistic = statistic
+    ) 
+}
+
+
+tb_glm_sr <- bind_rows(
+  tidy_table(glm_sr_plant) %>% dplyr::mutate(species = "Plant"),
+  tidy_table(glm_sr_bird) %>% dplyr::mutate(species = "Bird"),
+  tidy_table(glm_sr_butterfly) %>% dplyr::mutate(species = "Butterfly")
+  ) %>% 
+  dplyr::select(species, everything())
+
+
+#write.csv(tb_glm_sr, "./output/table_glm_sr.csv")
 
 

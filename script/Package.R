@@ -7,7 +7,7 @@ pacman::p_load(
   tidyverse,  # data management
   lme4, lmerTest, broom, multcomp, #GLM
   ggeffects, patchwork, ggsci, ggsignif,  # ggplot
-  vegan, iNEXT # composition
+  vegan, iNEXT, betapart # composition
 )
 
 
