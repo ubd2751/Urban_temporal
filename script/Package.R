@@ -7,7 +7,8 @@ pacman::p_load(
   tidyverse,  # data management
   lme4, lmerTest, broom, multcomp, #GLM
   ggeffects, patchwork, ggsci, ggsignif,  # ggplot
-  vegan, iNEXT, betapart # composition
+  vegan, iNEXT, betapart, # composition
+  exactRankTests  # wilcoxon test
 )
 
 
@@ -17,3 +18,4 @@ options(
   readr.show_col_types = FALSE,
   readr.show_progress = FALSE
 )
+

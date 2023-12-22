@@ -4,7 +4,7 @@
 
 ## Estimate a species richness--------------
 
-# Function of estimation for species richness
+# Function of estimation for species richness 
 est_sr <- function(x) {
   x %>% 
     dplyr::filter(value == 1 & (exotic == "Native" | exotic == "Exotic")) %>% 
@@ -31,6 +31,8 @@ est_sr <- function(x) {
       ) 
 }
 
+
+
 # Estimate a species richnesss
 sr_plant <- est_sr(df_plant)
 sr_bird <- est_sr(df_bird)
@@ -39,7 +41,49 @@ sr_butterfly <- est_sr(df_butterfly)
 
 
 
-# Boxplot ------------------------------------------------------------------
+
+
+# Wilcoxon test -------------------------------------
+
+# Function of wilcocon test
+test_wicoxon <- function(x) {
+  
+  # For compare a species richness
+  wlcx <- x %>%
+    dplyr::group_nest(exotic) %>% 
+    dplyr::mutate(
+      test = map(data, ~wilcox.exact(sr ~ time, data =., paired = TRUE)),
+      summary = map(test, ~tidy(.))
+      )
+  
+  
+  # Exclude a P-value for boxplots
+  wlcx %>% 
+    unnest(summary) %>% 
+    dplyr::select(exotic, p.value) %>% 
+    dplyr::mutate(
+      char = "p = ",
+      p.value = round(p.value, 3)
+      ) %>%
+    unite(col = char_pval, char, p.value, remove = F, sep = "") 
+  } 
+
+
+# Compare a species richness between time
+wlcx_sr_plant <- test_wicoxon(sr_plant)
+wlcx_sr_bird <- test_wicoxon(sr_bird) %>% filter(exotic != "Exotic species")
+wlcx_sr_butterfy <- test_wicoxon(sr_butterfly)
+
+
+
+
+
+
+
+
+
+
+# Boxplot ---------------------------------------------------------------
 
 ## Plant
 box_sr_plant <- 
@@ -55,13 +99,13 @@ box_sr_plant <-
     geom_line(aes(group = interaction(exotic, site)), 
               color = "grey50", linewidth = 0.2, alpha = 0.3) +
     facet_wrap(~exotic, ncol = 3) +
-    #geom_signif(
-    #  data = p_val_wlcx_sr_time,
-    #  aes(y_position = c(870, 830, 220), 
-    #      xmin = c(1, 1, 1), xmax = c(2, 2, 2),
-    #      annotations = char_pval),
-    #  size = 0.1, textsize = 1.3, manual = TRUE, 
-    #  tip_length = 0.05, vjust = -0.5) +
+    geom_signif(
+      data = wlcx_sr_plant,
+      aes(y_position = c(870, 830, 220), 
+          xmin = c(1, 1, 1), xmax = c(2, 2, 2),
+          annotations = char_pval),
+      size = 0.1, textsize = 1.3, manual = TRUE, 
+      tip_length = 0.05, vjust = -0.5) +
     scale_y_continuous(limits = c(0, 950)) +
     labs(
       x = "Time",
@@ -84,8 +128,9 @@ box_sr_plant
 
 
 ## Bird
-box_sr_bird <- 
-  ggplot(data = sr_bird, aes(x = time, y = sr)) +
+box_sr_bird <- sr_bird %>% 
+  dplyr::filter(exotic != "Exotic species") %>% 
+  ggplot(aes(x = time, y = sr)) +
     geom_boxplot(
       aes(color = time), outlier.colour = NA,
       width = 0.8, size = 0.2
@@ -101,9 +146,9 @@ box_sr_bird <-
   
     facet_wrap(~exotic, ncol = 3) +
     geom_signif(
-      data = p_val_wlcx_sr_bird_time,
-      aes(y_position = c(150, 145, 30), 
-          xmin = c(1, 1, 1), xmax = c(2, 2, 2),
+      data = wlcx_sr_bird ,
+      aes(y_position = c(150, 145), 
+          xmin = c(1, 1), xmax = c(2, 2),
           annotations = char_pval),
       size = 0.1, textsize = 1.3, manual = TRUE, 
       tip_length = 0.05, vjust = -0.5
@@ -138,7 +183,7 @@ box_sr_butterfly <-
               color = "grey50", linewidth = 0.2, alpha = 0.3) +
     facet_wrap(~exotic, ncol = 2) +
     geom_signif(
-      data = p_val_wlcx_sr_butterfly,
+      data = wlcx_sr_butterfy,
       aes(y_position = c(60, 60), 
           xmin = c(1, 1), xmax = c(2, 2),
           annotations = char_pval),
@@ -168,7 +213,7 @@ box_sr_butterfly
 ## Combining
 layout <- "
 AAAAAA
-BBBBBB
+BBBB##
 CCCC##
 "
 
@@ -176,7 +221,7 @@ box_sr_time <-
   (box_sr_plant / box_sr_bird / box_sr_butterfly) +
   plot_layout(design = layout) 
   
-
+box_sr_time
 
 # For save
 ggsave(box_sr_time, file = "output/box_sr_time.png",

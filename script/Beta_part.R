@@ -104,19 +104,89 @@ df_betapart <- bind_rows(
 
 # Boxplot ----------------------
 
-df_betapart %>% 
-  pivot_longer(cols = starts_with("beta")) %>% 
-  ggplot(aes(x = name, y = value, fill = name)) +
+## Wilcoxon test -------------------------------------
+
+wlcx_betapart <- df_betapart %>% 
+  dplyr::filter(name != "beta.sim") %>% 
+  dplyr::group_nest(species, exotic) %>% 
+  dplyr::mutate(
+    test = map(data, ~wilcox.exact(value ~ name, data =., paired = TRUE)),
+    summary = map(test, ~tidy(.))
+    ) %>% 
+  
+  unnest(summary) %>% 
+  dplyr::select(species, exotic, p.value) %>% 
+  dplyr::mutate(
+    char = "p = ",
+    p.value = round(p.value, 3)
+    ) 
+  unite(col = char_pval, char, p.value, remove = F, sep = "") 
+  
+
+
+
+
+box_betepart <- df_betapart %>% 
+  dplyr::filter(name != "beta.sor") %>% 
+  dplyr::mutate(
+    species = recode_factor(
+      species,
+      "Plant" = "Plant",
+      "Bird" = "Bird",
+      "Butterfly" = "Butterfly"
+      ),
+    exotic = recode_factor(
+      exotic,
+      "All" = "All species",
+      "Native" = "Native species",
+      "Exotic" = "Exotic species"
+      ),
+    name = recode_factor(
+      name,
+      "beta.sim" = "Turnover",
+      "beta.sne" = "Nestedness"
+      )
+    ) %>% 
+  ggplot(aes(x = name, y = value, color = name)) +
     geom_boxplot() +
-    facet_grid(species ~ exotic)
+    facet_grid(exotic ~ species, switch = "y") +
+    
+    geom_signif(
+      test = "wilcox.test", 
+      comparisons = list(c("Turnover", "Nestedness")),
+      map_signif_level = T,
+      textsize = 2,
+      size = 0.2,
+      color = "grey60"
+      ) +
+    
+    labs(
+      x = "Beta diversity component",
+      y = "Beta diversity"
+    ) +
+    scale_color_brewer(palette = "Set1") +
+    scale_y_continuous(breaks = seq(0, 0.8, 0.2), limits = c(0, 0.7))+
+    theme_bw(base_size = 6) +
+    theme(
+      legend.position = "none",
+      strip.placement = "outsite",
+      strip.background = element_blank(),
+      panel.grid = element_blank()
+      )
+
+box_betepart
+
+ggsave(box_betepart, file = "output/box_betapart.png", 
+       width = 90, height = 90, units = "mm", dpi = 500)
+
+
 
 
 
 # GLM ---------------------------
 
 glm_betapart <- df_betapart %>% 
-  #dplyr::filter(name != "beta.sim") %>% 
-  
+  dplyr::filter(name != "beta.sim") %>% 
   dplyr::group_nest(species, exotic, name) %>% 
   dplyr::mutate(
     model = map(data, ~lm(value ~ year + area + green_rate, data = .)),
