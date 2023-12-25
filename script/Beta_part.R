@@ -186,7 +186,7 @@ ggsave(box_betepart, file = "output/box_betapart.png",
 # GLM ---------------------------
 
 glm_betapart <- df_betapart %>% 
-  dplyr::filter(name != "beta.sim") %>% 
+  #dplyr::filter(name != "beta.sim") %>% 
   dplyr::group_nest(species, exotic, name) %>% 
   dplyr::mutate(
     model = map(data, ~lm(value ~ year + area + green_rate, data = .)),
