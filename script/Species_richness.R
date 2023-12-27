@@ -245,7 +245,8 @@ glm_sr_plant <- sr_plant %>%
   group_nest(exotic) %>% 
   dplyr::mutate(
     model = map(data, ~ glm(sr ~ year + area + green_rate, data = .)),
-    summary = map(model, ~tidy(.))
+    summary = map(model, ~tidy(.)),
+    anova = map(model, ~anova(.) %>% tidy())
     )
 
 
@@ -298,7 +299,6 @@ tidy_table <- function(x) {
     ) 
 }
 
-
 tb_glm_sr <- bind_rows(
   tidy_table(glm_sr_plant) %>% dplyr::mutate(species = "Plant"),
   tidy_table(glm_sr_bird) %>% dplyr::mutate(species = "Bird"),
@@ -306,7 +306,28 @@ tb_glm_sr <- bind_rows(
   ) %>% 
   dplyr::select(species, everything())
 
-
 #write.csv(tb_glm_sr, "./output/table_glm_sr.csv")
+
+
+
+
+
+### Plot 
+sr_plant %>% 
+  left_join(env, by = "site") %>% 
+  pivot_wider(names_from = time, values_from = sr) %>% 
+  dplyr::mutate(sr = Past - Present) %>% 
+  
+  
+  ggplot(aes(x = year, y = sr, color = exotic)) +
+  geom_point() +
+  stat_smooth(method = "lm", se = FALSE)
+
+
+
+
+
+
+
 
 

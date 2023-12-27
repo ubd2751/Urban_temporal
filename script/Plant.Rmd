@@ -565,19 +565,12 @@ Load a survey data (plant and Environment)
 plant <- read_csv("data/df_plant.csv")
 env   <- read_csv("data/Environment.csv")
 
-df_plant <- 
-  plant %>% 
+df_plant <- plant %>% 
   dplyr::mutate(time = if_else(str_detect(site, "過去"), "past", "now")) %>% 
   dplyr::select(site, time, everything()) %>% 
   dplyr::mutate(site = str_sub(site, end = -3)) %>% 
-  pivot_longer(cols = -c(site, time), names_to = "species") 
-```
-
-Combine the survey, dispersal, and exotic data
-
-```{r}
-df_plant_trait <- 
-  df_plant %>% 
+  pivot_longer(cols = -c(site, time), names_to = "species") %>% 
+  
   dplyr::inner_join(df_trait, by = "species") 
 ```
 
@@ -586,7 +579,7 @@ Number of species without dispersal type data
 ```{r}
 df_plant_trait %>% 
   distinct(species, .keep_all = TRUE) %>% 
-  filter(is.na(growth))
+  dplyr::filter(disper == "water" & time == "past") 
 ```
 
 ## Species richness
@@ -716,16 +709,15 @@ Relationships between lost species and trait, environmental variables
 
 ```{r}
 glm_plant_lost <- df_plant_lost %>% 
-    dplyr::mutate(across(where(is.character), as.factor)) %>% 
-    group_by(exotic) %>% 
-    nest() %>% 
-    dplyr::mutate(
-      
-      # GLM
-      fit = map(
-        data, 
-        ~glm(lost ~ year + area + green_rate + growth + disper, 
-             family = "binomial", data = .)),
+  dplyr::mutate(across(where(is.character), as.factor)) %>% 
+  group_nest(exotic) %>% 
+  dplyr::mutate(
+    
+    # GLM
+    fit = map(
+      data, 
+      ~glm(lost ~ year + area + green_rate + growth + disper, 
+           family = "binomial", data = .)),
       summary_fit = map(fit, ~tidy(.)),
       
       
@@ -837,7 +829,7 @@ write.csv(tb_glm_plant_lost, "output/glm_lost_plant.csv")
 #### Growth form
 ```{r}
 plot_glm_pant_lost_growth <- glm_plant_lost %>% 
-  dplyr::select(multi_grow_conf) %>% 
+  dplyr::select(exotic, multi_grow_conf) %>% 
   unnest(multi_grow_conf) %>% 
   dplyr::mutate(
     exotic = recode_factor(
@@ -877,7 +869,7 @@ cha_glm_plant_lost_growth <-
     tidy(glm_plant_lost$multi_grow_char[[2]])
     ) %>% 
   mutate(
-    exotic = fct_inorder(rep(c("Native species","Exotic species"), each = 3)),
+    exotic = fct_inorder(rep(c("Exotic species","Native species"), each = 3)),
     growth = fct_inorder(rep(c("Annual","Perennial","Tree"), 2))
     )
 ```
@@ -939,7 +931,7 @@ ggsave(
 #### Dispersal type
 ```{r}
 plot_glm_pant_lost_disper <- glm_plant_lost %>% 
-  dplyr::select(multi_disper_conf) %>% 
+  dplyr::select(exotic, multi_disper_conf) %>% 
   unnest(multi_disper_conf) %>% 
   dplyr::mutate(
     exotic = recode_factor(
@@ -977,7 +969,7 @@ cha_glm_plant_lost_disper <-
     tidy(glm_plant_lost$multi_disper_char[[2]])
     ) %>% 
   mutate(
-    exotic = fct_inorder(rep(c("Native species","Exotic species"), each = 4)),
+    exotic = fct_inorder(rep(c("Exotic species","Native species"), each = 4)),
     growth = fct_inorder(rep(c("Animal","Gravity","Water","Wind"), 2))
     )
 ```
@@ -1138,14 +1130,12 @@ ggsave(
 Estimate a number of colonized species
 
 ```{r}
-df_plant_colo <-
-  df_plant %>% 
-    pivot_wider(names_from = time, values_from = value) %>% 
-    dplyr::mutate(colo = if_else(now == 1 & past == 0, 1, 0)) %>% 
-    dplyr::left_join(df_trait, by = "species") %>% 
-    dplyr::left_join(env, by = "site") %>% 
-    dplyr::filter(!is.na(exotic) & now == 1) %>% 
-    dplyr::mutate(across(where(is.character), as.factor))
+df_plant_colo <- df_plant %>%
+  pivot_wider(names_from = time, values_from = value) %>% 
+  dplyr::mutate(colo = if_else(now == 1 & past == 0, 1, 0)) %>% 
+  dplyr::left_join(env, by = "site") %>% 
+  dplyr::filter(!is.na(exotic) & now == 1) %>% 
+  dplyr::mutate(across(where(is.character), as.factor))
 ```
 
 Confirmation of number of colonized species across dispersal type
@@ -1154,6 +1144,11 @@ df_plant_colo %>%
   dplyr::group_by(exotic, disper) %>% 
   dplyr::summarise(n = n_distinct(species)) %>% 
   na.omit()
+
+
+
+df_plant_colo %>% 
+  dplyr::filter(colo == 1 & disper == "water")
 ```
 
 ### GLM
@@ -1163,8 +1158,7 @@ Relationships between colonized species and trait, environmental variables
 ```{r}
 glm_plant_colo <- df_plant_colo %>% 
     dplyr::mutate(across(where(is.character), as.factor)) %>% 
-    group_by(exotic) %>% 
-    nest() %>% 
+    group_nest(exotic) %>% 
     dplyr::mutate(
       
       # GLM
@@ -1283,7 +1277,7 @@ write.csv(df_rsq_glm_plant_colo, "output/rsq_glm_plant_colo.csv")
 
 ```{r}
 plot_glm_pant_colo_growth <- glm_plant_colo %>% 
-  dplyr::select(multi_grow_conf) %>% 
+  dplyr::select(exotic, multi_grow_conf) %>% 
   unnest(multi_grow_conf) %>% 
   dplyr::mutate(
     exotic = recode_factor(
@@ -1335,18 +1329,6 @@ cha_glm_plant_colo_growth <-
 
 
 Plot for result of glm of growth form
-
-```{r}
-glm_plant_colo %>% 
-  dplyr::select(multi_dipser_conf) %>% 
-  unnest(multi_dipser_conf) %>% 
-  
-  ggplot(aes(x = estimate, y = contrast, xmin = conf.low, xmax = conf.high)) +
-    geom_errorbar(width = 0.1) + 
-    geom_point() + 
-    facet_grid(.~exotic)
-```
-
 
 ```{r}
 box_plant_colo_growth <- 
@@ -1405,7 +1387,7 @@ ggsave(
 
 ```{r}
 plot_glm_pant_colo_disper <- glm_plant_colo %>% 
-  dplyr::select(multi_disper_conf) %>% 
+  dplyr::select(exotic, multi_disper_conf) %>% 
   unnest(multi_disper_conf) %>% 
   dplyr::mutate(
     exotic = recode_factor(
@@ -1427,7 +1409,7 @@ plot_glm_pant_colo_disper <- glm_plant_colo %>%
 
 
 ggsave(
-  plot_glm_pant_lost_growth,
+  plot_glm_pant_colo_disper,
   file = "output/plot_glm_plant_colo_disper.png",
   width = 120, height = 60, units = "mm", dpi = 500)
 ```
@@ -1442,8 +1424,8 @@ cha_glm_plant_colo_disper <-
     tidy(glm_plant_colo$multi_disper_char[[1]]),
     tidy(glm_plant_colo$multi_disper_char[[2]])
     ) %>% 
-  mutate(
-    exotic = fct_inorder(rep(c("Native species","Exotic species"), each = 4)),
+  dplyr::mutate(
+    exotic = fct_inorder(rep(c("Exotic species","Native species"), each = 4)),
     growth = fct_inorder(rep(c("Animal","Gravity","Water","Wind"), 2))
     )
 ```
@@ -1500,6 +1482,7 @@ ggsave(
   file = "output/box_plant_colo_disper.png",
   width = 100, height = 60, units = "mm", dpi = 500)
 ```
+
 
 #### Environment
 Plot for the result of GLM of environmental variables
