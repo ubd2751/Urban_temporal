@@ -47,7 +47,7 @@ Confirmation of number of lost species across dispersal type
 ```{r}
 df_plant_lost %>% 
   dplyr::group_by(exotic, disper) %>% 
-  dplyr::summarise(n = n_distinct(species)) %>% 
+  dplyr::summarise(n = sum(lost)/n()) %>% 
   na.omit()
 ```
 
@@ -488,15 +488,10 @@ df_plant_colo <- df_plant %>%
 
 Confirmation of number of colonized species across dispersal type
 ```{r}
-df_plant_colo %>% 
+df_plant_colo%>% 
   dplyr::group_by(exotic, disper) %>% 
-  dplyr::summarise(n = n_distinct(species)) %>% 
+  dplyr::summarise(n = sum(colo)/n()) %>% 
   na.omit()
-
-
-
-df_plant_colo %>% 
-  dplyr::filter(colo == 1 & disper == "water")
 ```
 
 ### GLM

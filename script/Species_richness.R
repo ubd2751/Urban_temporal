@@ -32,13 +32,10 @@ est_sr <- function(x) {
 }
 
 
-
 # Estimate a species richnesss
 sr_plant <- est_sr(df_plant)
 sr_bird <- est_sr(df_bird)
 sr_butterfly <- est_sr(df_butterfly)
-
-
 
 
 
@@ -246,7 +243,7 @@ glm_sr_plant <- sr_plant %>%
   dplyr::mutate(
     model = map(data, ~ glm(sr ~ year + area + green_rate, data = .)),
     summary = map(model, ~tidy(.)),
-    anova = map(model, ~anova(.) %>% tidy())
+    predict = map(model, ~ggpredict(., terms = "year"))
     )
 
 
@@ -309,19 +306,6 @@ tb_glm_sr <- bind_rows(
 #write.csv(tb_glm_sr, "./output/table_glm_sr.csv")
 
 
-
-
-
-### Plot 
-sr_plant %>% 
-  left_join(env, by = "site") %>% 
-  pivot_wider(names_from = time, values_from = sr) %>% 
-  dplyr::mutate(sr = Past - Present) %>% 
-  
-  
-  ggplot(aes(x = year, y = sr, color = exotic)) +
-  geom_point() +
-  stat_smooth(method = "lm", se = FALSE)
 
 
 
