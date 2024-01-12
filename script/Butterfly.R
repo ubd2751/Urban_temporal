@@ -215,6 +215,14 @@ df_butterfly_lost <-
     dplyr::mutate(across(where(is.character), as.factor)) 
 
 
+# number of lost species
+df_butterfly_lost %>% 
+  dplyr::group_by(site) %>% 
+  dplyr::filter(lost == 1) %>% 
+  dplyr::summarise(n = n_distinct(species)) %>% 
+  na.omit() %>% 
+  dplyr::summarise(n = mean(n)) 
+
 
 
 # GLM
@@ -274,7 +282,12 @@ df_butterfly_colo <-
       across(c(FlightDuration:hostplant, year:green_rate), scale)
       )
 
-
+# Number of colonized species
+df_butterfly_colo %>% 
+  dplyr::group_by(site) %>% 
+  dplyr::filter(colo == 1) %>% 
+  dplyr::summarise(n = n_distinct(species)) %>% 
+  dplyr::summarise(n = mean(n)) 
 
 
 # GLM

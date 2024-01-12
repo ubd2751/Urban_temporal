@@ -239,6 +239,16 @@ df_bird_lost <-
     dplyr::mutate(exotic = factor(exotic, levels = c("Native", "Exotic")))
 ```
 
+```{r}
+df_bird_lost %>% 
+  dplyr::group_by(exotic, site) %>% 
+  dplyr::filter(lost == 1) %>% 
+  dplyr::summarise(n = n_distinct(species)) %>% 
+  na.omit() %>% 
+  dplyr::summarise(n = mean(n)) 
+```
+
+
 
 ### GLM
 Relationships between lost of species and trait
@@ -313,6 +323,15 @@ df_bird_colo <-
       # scaling for explanatory variables
       across(c(Beak.Length_Culmen:Mass, year:green_rate), scale)
       ) 
+```
+
+```{r}
+df_bird_colo %>% 
+  dplyr::group_by(exotic, site) %>% 
+  dplyr::filter(colo == 1) %>% 
+  dplyr::summarise(n = n_distinct(species)) %>% 
+  na.omit() %>% 
+  dplyr::summarise(n = mean(n)) 
 ```
 
 

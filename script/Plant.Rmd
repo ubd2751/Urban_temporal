@@ -42,6 +42,17 @@ df_plant_lost <- df_plant %>%
   dplyr::filter(!is.na(exotic) & past == 1) %>% 
   dplyr::mutate(across(where(is.character), as.factor))
 ```
+Lost species richness
+```{r}
+df_plant_lost %>% 
+  dplyr::group_by(exotic, site) %>% 
+  dplyr::filter(lost == 1) %>% 
+  dplyr::summarise(n = n_distinct(species)) %>% 
+  na.omit() %>% 
+  dplyr::summarise(n = mean(n)) 
+```
+
+
 
 Confirmation of number of lost species across dispersal type
 ```{r}
@@ -485,6 +496,17 @@ df_plant_colo <- df_plant %>%
   dplyr::filter(!is.na(exotic) & now == 1) %>% 
   dplyr::mutate(across(where(is.character), as.factor))
 ```
+
+```{r}
+df_plant_colo %>% 
+  dplyr::group_by(exotic, site) %>% 
+  dplyr::filter(colo == 1) %>% 
+  dplyr::summarise(n = n_distinct(species)) %>% 
+  na.omit() %>% 
+  dplyr::summarise(n = mean(n)) 
+```
+
+
 
 Confirmation of number of colonized species across dispersal type
 ```{r}
