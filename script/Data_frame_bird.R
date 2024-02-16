@@ -87,6 +87,6 @@ df_bird <- bird %>%
 # Species richness at each time 
 df_bird %>% 
   dplyr::filter(value == 1 & (exotic == "Native" | exotic == "Exotic")) %>% 
-  dplyr::group_by(time, exotic) %>% 
+  dplyr::group_by(exotic) %>% 
   dplyr::summarise(sr = n_distinct(species), .groups = "drop") 
 

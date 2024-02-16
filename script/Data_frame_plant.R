@@ -460,7 +460,7 @@ df_plant <- plant %>%
 # Species richness at each time 
 df_plant %>% 
   dplyr::filter(value == 1 & (exotic == "Native" | exotic == "Exotic")) %>% 
-  dplyr::group_by(time, exotic) %>% 
+  dplyr::group_by(exotic) %>% 
   dplyr::summarise(sr = n_distinct(species), .groups = "drop") 
 
 

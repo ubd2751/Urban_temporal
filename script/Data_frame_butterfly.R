@@ -97,8 +97,7 @@ df_butterfly <- butterfly %>%
 
 # Species richness at each time 
 df_butterfly %>% 
-  dplyr::filter(value == 1 & (exotic == "Native" | exotic == "Exotic")) 
-  dplyr::group_by(time, exotic) %>% 
+  dplyr::filter(value == 1 & (exotic == "Native" | exotic == "Exotic"))
   dplyr::summarise(sr = n_distinct(species), .groups = "drop") 
 
 
