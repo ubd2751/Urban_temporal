@@ -5,7 +5,8 @@
 pacman::p_load(
   tidyverse,  # data management
   iNEXT,      # rarefaction
-  patchwork, ggpubr
+  patchwork, ggpubr,
+  gridExtra, grid
   )
 
 
@@ -96,17 +97,16 @@ p_inext_plant <-
   ggiNEXT(inext_plant) +
     labs(
       title = "Plant",
-      subtitle = "All species",
       x = "Number of sites",
       y = "Species richness"
       ) +
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
     scale_x_continuous(limits = c(0, 30)) +
-    theme_bw(base_size = 8) +
+    theme_bw(base_size = 12) +
     theme(
       panel.grid = element_blank(),
-      plot.subtitle = element_text(hjust = 0.5, size = 7),
+      plot.subtitle = element_text(hjust = 0.5, size = 10),
       axis.title.x = element_blank(),
       axis.title.y = element_blank(),
       legend.position = "none"
@@ -118,17 +118,16 @@ p_inext_plant_n <-
   ggiNEXT(inext_plant_n) +
     labs(
       title = "",
-      subtitle = "Native species",
       x = "Number of sites",
       y = "Species richness"
     ) +
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
     scale_x_continuous(limits = c(0, 30)) +
-    theme_bw(base_size = 8) +
+    theme_bw(base_size = 12) +
     theme(
       panel.grid = element_blank(),
-      plot.subtitle = element_text(hjust = 0.5, size = 7),
+      plot.subtitle = element_text(hjust = 0.5, size = 10),
       axis.title.x = element_blank(),
       axis.title.y = element_blank(),
       legend.position = "none"
@@ -141,17 +140,16 @@ p_inext_plant_e <-
   ggiNEXT(inext_plant_e) +
     labs(
       title = "",
-      subtitle = "Exotic species",
       x = "Number of sites",
       y = "Species richness"
     ) +
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
     #scale_y_continuous(limits = c(0, 1500)) +
-    theme_bw(base_size = 8) +
+    theme_bw(base_size = 12) +
     theme(
       panel.grid = element_blank(),
-      plot.subtitle = element_text(hjust = 0.5, size = 7),
+      plot.subtitle = element_text(hjust = 0.5, size = 10),
       axis.title.x = element_blank(),
       axis.title.y = element_blank(),
       legend.position = "none"
@@ -171,10 +169,9 @@ p_inext_bird <-
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
     scale_x_continuous(limits = c(0, 15)) +
-    theme_bw(base_size = 8) +
+    theme_bw(base_size = 12) +
     theme(
       panel.grid = element_blank(),
-      plot.subtitle = element_text(hjust = 0.5, size = 5),
       axis.title.x = element_blank(),
       axis.title.y = element_blank(),
       legend.position = "none"
@@ -193,7 +190,7 @@ p_inext_bird_n <-
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
     scale_x_continuous(limits = c(0, 15)) +
-    theme_bw(base_size = 8) +
+    theme_bw(base_size = 12) +
     theme(
       panel.grid = element_blank(),
       axis.title.x = element_blank(),
@@ -214,7 +211,7 @@ p_inext_butterfly <-
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
     scale_x_continuous(limits = c(0, 15)) +
-    theme_bw(base_size = 8) +
+    theme_bw(base_size = 12) +
     theme(
       panel.grid = element_blank(),
       axis.title.x = element_blank(),
@@ -234,7 +231,7 @@ p_inext_butterfly_n <-
   scale_color_manual(values = c("#00AFBB", "#E7B800")) +
   scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
   scale_x_continuous(limits = c(0, 15)) +
-  theme_bw(base_size = 8) +
+  theme_bw(base_size = 12) +
   theme(
     panel.grid = element_blank(),
     axis.title.x = element_blank(),
@@ -286,8 +283,8 @@ legend_inext <- p_legend %>%
 
 
 # Axis label
-bottom <- textGrob("Number of sites", gp = gpar(fontsize = 8))
-y_left <- textGrob("Species richness", gp = gpar(fontsize = 8), rot = 90)
+bottom <- grid::textGrob("Number of sites", gp = gpar(fontsize = 12))
+y_left <- grid::textGrob("Species richness", gp = gpar(fontsize = 12), rot = 90)
 
 grid.arrange(
   p_inext_plant, p_inext_plant_n, p_inext_plant_e,
@@ -313,8 +310,8 @@ ggsave(
     layout_matrix = rbind(c(1, 2, 3),
                           c(4, 5, 6),
                           c(7, 8, NA))), 
-  file = "output/iNEXT.png", 
-  width = 140, height = 145, units = "mm", dpi = 500)
+  file = "output/iNEXT.pdf", 
+  width = 180, height = 180, units = "mm", dpi = 600)
 
 
 

@@ -67,9 +67,12 @@ test_wicoxon <- function(x) {
 
 
 # Compare a species richness between time
-wlcx_sr_plant <- test_wicoxon(sr_plant)
+wlcx_sr_plant <- test_wicoxon(sr_plant) 
 wlcx_sr_bird <- test_wicoxon(sr_bird) %>% filter(exotic != "Exotic species")
-wlcx_sr_butterfy <- test_wicoxon(sr_butterfly)
+
+wlcx_sr_butterfy <- 
+  test_wicoxon(sr_butterfly) %>% 
+  dplyr::filter(exotic != "Exotic species")
 
 
 
@@ -87,21 +90,15 @@ box_sr_plant <-
   ggplot(data = sr_plant, aes(x = time, y = sr)) +
     geom_boxplot(
       aes(color = time), outlier.colour = NA,
-      width = 0.8, size = 0.2
+      width = 0.8, size = 0.5
       ) +
-    geom_point(
-      aes(color = time), size = 0.5, alpha = 0.8,
-      position = position_jitterdodge(-1)
-      ) +
-    geom_line(aes(group = interaction(exotic, site)), 
-              color = "grey50", linewidth = 0.2, alpha = 0.3) +
     facet_wrap(~exotic, ncol = 3) +
     geom_signif(
       data = wlcx_sr_plant,
       aes(y_position = c(870, 830, 220), 
           xmin = c(1, 1, 1), xmax = c(2, 2, 2),
           annotations = char_pval),
-      size = 0.1, textsize = 1.3, manual = TRUE, 
+      size = 0.1, textsize = 2.5, manual = TRUE, 
       tip_length = 0.05, vjust = -0.5) +
     scale_y_continuous(limits = c(0, 950)) +
     labs(
@@ -110,99 +107,84 @@ box_sr_plant <-
       fill = "Time",
       title = "Plant"
       ) +
-    theme_classic(base_size = 5) +
+    theme_classic(base_size = 8) +
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     theme(
       panel.grid = element_blank(),
       legend.position = "none",
       #strip.background = element_blank(),
-      strip.text = element_text(size = 5),
+      strip.text = element_text(size = 8),
       axis.title.x = element_blank()
       )
 
-box_sr_plant
 
 
 
 ## Bird
-box_sr_bird <- sr_bird %>% 
-  dplyr::filter(exotic != "Exotic species") %>% 
-  ggplot(aes(x = time, y = sr)) +
-    geom_boxplot(
-      aes(color = time), outlier.colour = NA,
-      width = 0.8, size = 0.2
-      ) + 
-    geom_point(
-      aes(color = time), size = 0.5, alpha = 0.8,
-      position = position_jitterdodge(-1)
-      ) +
-    geom_line(
-      aes(group = interaction(exotic, site)), 
-      color = "grey50", linewidth = 0.2, alpha = 0.3
-      ) +
-  
-    facet_wrap(~exotic, ncol = 3) +
-    geom_signif(
-      data = wlcx_sr_bird ,
-      aes(y_position = c(150, 145), 
-          xmin = c(1, 1), xmax = c(2, 2),
-          annotations = char_pval),
-      size = 0.1, textsize = 1.3, manual = TRUE, 
-      tip_length = 0.05, vjust = -0.5
-      ) +
-    scale_y_continuous(limits = c(0, 160)) +
-    labs(title = "Bird", y = "Species richness") +
-    scale_color_manual(values = c("#00AFBB", "#E7B800")) +
-    theme_classic(base_size = 5) +
-    theme(
-      legend.position = "none",
-      strip.background = element_blank(),
-      strip.text = element_blank(),
-      axis.title.x = element_blank()
-      )
-
-box_sr_bird
+box_sr_bird <- 
+  sr_bird %>% 
+    dplyr::filter(exotic != "Exotic species") %>% 
+    ggplot(aes(x = time, y = sr)) +
+      geom_boxplot(
+        aes(color = time), outlier.colour = NA,
+        width = 0.8, size = 0.5
+        ) + 
+      facet_wrap(~exotic, ncol = 3) +
+      geom_signif(
+        data = wlcx_sr_bird ,
+        aes(y_position = c(150, 145), 
+            xmin = c(1, 1), xmax = c(2, 2),
+            annotations = char_pval),
+        size = 0.1, textsize = 2.5, manual = TRUE, 
+        tip_length = 0.05, vjust = -0.5
+        ) +
+      scale_y_continuous(limits = c(0, 160)) +
+      labs(title = "Bird", y = "Species richness") +
+      scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+      theme_classic(base_size = 8) +
+      theme(
+        legend.position = "none",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.title.x = element_blank()
+        )
 
 
 
 ## Butterfly
 box_sr_butterfly <- 
-  ggplot(data = sr_butterfly, aes(x = time, y = sr)) +
-    geom_boxplot(
-      aes(color = time), outlier.colour = NA,
-      width = 0.8, size = 0.2
-      ) + 
-    geom_point(
-      aes(color = time), size = 0.5, alpha = 0.8,
-      position = position_jitterdodge(-1)
+  sr_butterfly %>%
+    dplyr::filter(exotic != "Exotic species") %>% 
+    ggplot(aes(x = time, y = sr)) +
+      geom_boxplot(
+        aes(color = time), outlier.colour = NA,
+        width = 0.8, size = 0.5
+        ) + 
+      facet_wrap(~exotic, ncol = 2) +
+      geom_signif(
+        data = wlcx_sr_butterfy,
+        aes(y_position = c(60, 60), 
+            xmin = c(1, 1), xmax = c(2, 2),
+            annotations = char_pval),
+        size = 0.1, textsize = 2.5, manual = TRUE, 
+        tip_length = 0.05, vjust = -0.5) +
+      scale_y_continuous(limits = c(10, 70)) +
+      labs(
+        title = "Butterfly",
+        fill = "Time",
+        x = "Time",
+        y = "Species richness"
       ) +
-    geom_line(aes(group = interaction(exotic, site)), 
-              color = "grey50", linewidth = 0.2, alpha = 0.3) +
-    facet_wrap(~exotic, ncol = 2) +
-    geom_signif(
-      data = wlcx_sr_butterfy,
-      aes(y_position = c(60, 60), 
-          xmin = c(1, 1), xmax = c(2, 2),
-          annotations = char_pval),
-      size = 0.1, textsize = 1.3, manual = TRUE, 
-      tip_length = 0.05, vjust = -0.5) +
-    scale_y_continuous(limits = c(10, 70)) +
-    labs(
-      title = "Butterfly",
-      fill = "Time",
-      x = "Time",
-      y = "Species richness"
-    ) +
-    scale_color_manual(values = c("#00AFBB", "#E7B800")) +
-    theme_classic(base_size = 5) +
-    theme(
-      panel.grid = element_blank(),
-      legend.position = "none",
-      strip.background = element_blank(),
-      strip.text = element_blank()
-      )
+      scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+      theme_classic(base_size = 8) +
+      theme(
+        panel.grid = element_blank(),
+        legend.position = "none",
+        strip.background = element_blank(),
+        strip.text = element_blank()
+        )
 
-box_sr_butterfly
+
 
 
 
@@ -222,7 +204,7 @@ box_sr_time
 
 # For save
 ggsave(box_sr_time, file = "output/box_sr_time.png",
-       width = 80, height = 80, units = "mm", dpi = 500)
+       width = 140, height = 140, units = "mm", dpi = 600)
 
 
 
@@ -233,6 +215,7 @@ ggsave(box_sr_time, file = "output/box_sr_time.png",
 
 ## GLM ------------------------------------------------------------
 
+### Model -----------
 # Plant
 glm_sr_plant <- sr_plant %>% 
   left_join(env, by = "site") %>% 
@@ -274,7 +257,9 @@ glm_sr_butterfly <- sr_butterfly %>%
 
 
 
-### Table for GLM
+
+
+### Table for GLM -----
 tidy_table <- function(x) {
   
   x %>% 
@@ -303,14 +288,102 @@ tb_glm_sr <- bind_rows(
   ) %>% 
   dplyr::select(species, everything())
 
-#write.csv(tb_glm_sr, "./output/table_glm_sr.csv")
+
+# output for result of GLM
+write.csv(tb_glm_sr, "./output/table_glm_sr.csv")
 
 
 
 
 
+### Plot for GLM -----
+
+# Plant
+plot_glm_tempSR_plant <- 
+  ggplot() + 
+  geom_point(
+    data = glm_sr_plant %>% unnest(data),
+    aes(year, sr, color = exotic, fill = exotic)
+    ) +
+  geom_smooth(
+    data = glm_sr_plant %>% unnest(predict) %>% 
+      dplyr::filter(exotic != "Exotic species"),
+    aes(x, predicted, color = exotic, fill = exotic)
+    ) +
+  geom_ribbon(
+    data = glm_sr_plant %>% unnest(predict) %>% 
+      dplyr::filter(exotic != "Exotic species"),
+    aes(x, ymin = conf.low, ymax = conf.high, fill = exotic),
+    alpha = 0.2
+    ) +
+  
+  scale_color_simpsons() +
+  scale_fill_simpsons() +
+  theme_classic() +
+  labs(
+    title = "Plant",
+    y = "Temporal species richness"
+    ) +
+  theme(
+    legend.position = c(0.3, 0.85),
+    legend.background = element_blank(),
+    legend.title = element_blank(),
+    legend.text = element_text(size = 8),
+    legend.key.size = unit(5, "mm"),
+    axis.title.x = element_blank()
+  )
 
 
+
+# Bird
+plot_glm_tempSR_bird <- 
+  ggplot() + 
+  geom_point(
+    data = glm_sr_bird %>% unnest(data) %>% 
+      dplyr::filter(exotic != "Exotic species"),
+    aes(year, sr, color = exotic, fill = exotic)
+  ) +
+  scale_color_simpsons() +
+  scale_fill_simpsons() +
+  theme_classic() +
+  labs(
+    title = "Bird",
+    x = "Years between surveys") +
+  theme(
+    legend.position = "none",
+    axis.title.y = element_blank()
+  )
+
+
+# Butterfly
+plot_glm_tempSR_butterfly <- 
+  ggplot() + 
+  geom_point(
+    data = glm_sr_butterfly %>% unnest(data) %>% 
+      dplyr::filter(exotic != "Exotic species"),
+    aes(year, sr, color = exotic, fill = exotic)
+  ) +
+  scale_color_simpsons() +
+  scale_fill_simpsons() +
+  theme_classic() +
+  labs(title = "Butterfly") +
+  theme(
+    legend.position = "none",
+    axis.title.y = element_blank(),
+    axis.title.x = element_blank()
+  )
+
+  
+
+plot_glm_tempSR <- 
+  plot_glm_tempSR_plant + plot_glm_tempSR_bird + plot_glm_tempSR_butterfly
+
+plot_glm_tempSR
+
+
+# For save
+ggsave(plot_glm_tempSR, file = "output/plot_glm_tempSR.png",
+       width = 180, height = 70, units = "mm", dpi = 600)
 
 
 

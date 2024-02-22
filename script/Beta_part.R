@@ -186,12 +186,20 @@ ggsave(box_betepart, file = "output/box_betapart.png",
 # GLM ---------------------------
 
 glm_betapart <- df_betapart %>% 
-  #dplyr::filter(name != "beta.sim") %>% 
   dplyr::group_nest(species, exotic, name) %>% 
   dplyr::mutate(
     model = map(data, ~lm(value ~ year + area + green_rate, data = .)),
-    summary = map(model, ~tidy(.))
+    summary = map(model, ~tidy(.)),
+    predict = map(model, ~ggpredict(., terms = "year")),
+    
+    species = factor(species, levels = c("Plant", "Bird", "Butterfly")),
+    exotic = factor(exotic, levels = c("All", "Native", "Exotic")),
+    beta =  fct_recode(name, 
+                       "Beta diversity" = "beta.sor",
+                       "Turnover" = "beta.sim",
+                       "Nestedness" = "beta.sne")
     ) 
+
 
 
 
@@ -220,4 +228,61 @@ tb_glm_betapart <- glm_betapart %>%
 
 
 
+## Plot for GLM of beta diversity
+
+plot_glm_tempbeta <- 
+  ggplot() + 
+  geom_point(
+    data = glm_betapart %>% unnest(data),
+    aes(year, value, color = exotic, fill = exotic)
+    ) +
+  geom_line(
+    data = glm_betapart %>% 
+      dplyr::filter(
+        species == "Plant" & exotic == "Native" & name == "beta.sne" |
+          species == "Plant" & exotic == "Exotic" & name == "beta.sor" |
+          species == "Bird" & exotic == "All" & name != "beta.sim" |
+          species == "Bird" & exotic == "Native" & name == "beta.sor" 
+        ) %>% 
+      unnest(predict),
+    aes(x, predicted, color = exotic)
+    ) +
+  geom_ribbon(
+    data = glm_betapart %>% 
+      dplyr::filter(
+        species == "Plant" & exotic == "Native" & name == "beta.sne" |
+          species == "Plant" & exotic == "Exotic" & name == "beta.sor" |
+          species == "Bird" & exotic == "All" & name != "beta.sim" |
+          species == "Bird" & exotic == "Native" & name == "beta.sor" 
+      ) %>% 
+      unnest(predict),
+    aes(x, ymin = conf.low, ymax = conf.high, fill = exotic),
+    alpha = 0.2
+    ) +
+  facet_grid(fct_rev(beta) ~ species, switch = "y") +
+  scale_y_continuous(breaks = seq(0, 0.9, length = 4))+
+  scale_color_simpsons(labels = c(All = "All species",
+                                  Native = "Native species",
+                                  Exotic = "Exotic species")) +
+  scale_fill_simpsons(labels = c(All = "All species",
+                                 Native = "Native species",
+                                 Exotic = "Exotic species")) +
+
+  labs(x = "Years beteen surveys") +
+  theme_bw(base_size = 13) +
+  theme(
+    legend.position = c(0.9, 0.94),
+    legend.background = element_blank(),
+    legend.title = element_blank(),
+    legend.text = element_text(size = 8),
+    legend.key.size = unit(5, "mm"),
+    axis.title.y = element_blank(),
+    strip.placement = "outside",
+    strip.background = element_blank(),
+    panel.grid = element_blank()
+    )
+
+
+ggsave(plot_glm_tempbeta, file = "output/plot_glm_tempbeta.png",
+       width = 180, height = 180, units = "mm", dpi = 600)
 
