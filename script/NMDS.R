@@ -1,6 +1,23 @@
 
 # NMDS #######################################################
 
+# Package ----------------
+pacman::p_load(
+  tidyverse,  # data management
+  lme4, lmerTest, broom, multcomp, #GLM
+  ggeffects, patchwork, ggsci, ggsignif,  # ggplot
+  vegan, iNEXT, betapart, # composition
+  exactRankTests  # wilcoxon test
+)
+
+
+# For read_csv
+options(
+  readr.num_columns = 0L,
+  readr.show_col_types = FALSE,
+  readr.show_progress = FALSE
+)
+
 
 # data frame for species composition
 df_comp <- function(x) {
@@ -16,8 +33,8 @@ df_comp <- function(x) {
   
 } 
 
-df_comp_plant <- df_comp(df_plant) 
-df_comp_bird <- df_comp(df_bird) 
+df_comp_plant     <- df_comp(df_plant) 
+df_comp_bird      <- df_comp(df_bird) 
 df_comp_butterfly <- df_comp(df_butterfly) 
 
 
@@ -25,7 +42,7 @@ df_comp_butterfly <- df_comp(df_butterfly)
 
 # NMDS & Permanova ----------------------------------------------------------
 
-# Function of estimation for nmds and permanova
+# Function of estimation for nmds, permanova, and dispersion
 est_nmds_prmnv <- function(x) {
   
   x %>% 
@@ -53,6 +70,9 @@ est_nmds_prmnv <- function(x) {
         data,
         ~ dplyr::select(., where(~ is.numeric(.) && sum(.) != 0))),
       
+      # Jaccard dissimilarity
+      jac = map(comp, ~vegdist(., method = "jac")),
+      
       # NMDS
       nmds = map(
         comp, 
@@ -64,11 +84,21 @@ est_nmds_prmnv <- function(x) {
       # NMDS stress value
       nmds_stress = map_dbl(nmds, ~.$stress),
       
+      
       # permanova
       permanova = map(data, ~adonis2(.[,-1:-2] ~ .$time, method = "jac")),
       
       # p-value of permanova
-      pval = map(permanova, ~as_tibble(.) %>% dplyr::select("Pr(>F)"))
+      pval_perma = map(permanova, ~as_tibble(.) %>% dplyr::select("Pr(>F)")),
+      
+      
+      # dispersion
+      dispersion = map(data, ~betadisper(
+        vegdist(.[,-1:-2], method = "jac"), .$time)
+        ),
+      
+      # p-value of dispersion
+      pval_disper = map(dispersion, ~anova(.) %>% dplyr::select("Pr(>F)"))
       )
 }
 
@@ -79,8 +109,7 @@ comp_plant <- est_nmds_prmnv(df_comp_plant) %>%
     exotic = recode_factor(
       exotic, 
       "All species" = "All species",
-      "Native species" = "Native species",
-      "Exotic" = "Exotic species")
+      "Native species" = "Native species")
     )
 
 comp_bird <- est_nmds_prmnv(df_comp_bird)
@@ -88,8 +117,10 @@ comp_butterfly <- est_nmds_prmnv(df_comp_butterfly)
 
 
 
-
-
+comp_plant %>% 
+  dplyr::select(pval_disper) %>% 
+  unnest(pval_disper) 
+  View()
 
 
 
@@ -99,14 +130,15 @@ comp_butterfly <- est_nmds_prmnv(df_comp_butterfly)
 label_nmds <- function(x) {
   
   x %>% 
-    dplyr::select(exotic, nmds_stress, pval) %>% 
-    unnest(pval) %>% 
+    dplyr::select(exotic, nmds_stress, pval_perma) %>% 
+    unnest(pval_perma) %>% 
     na.omit() %>% 
     dplyr::mutate(
       across(where(is.numeric), ~round(., digits = 3)),
       time = "Past",
       stressvalue = "Stress value:",
-      permanova_cha = "Permanova: p = "
+      permanova_cha = "Permanova: p = ",
+      dispersion_cha = "Dispersion: p = "
     ) %>% 
     unite(stress, stressvalue, nmds_stress, remove = F, sep = "") %>% 
     unite(permanova, permanova_cha, "Pr(>F)", remove = F, sep = "") 
@@ -121,11 +153,12 @@ label_nmds_butterfly <- label_nmds(comp_butterfly)
 # Plot for NMDS ----------
 
 # Plant
-p_nmds_plant <- comp_plant %>% 
+p_nmds_plant <- 
+  comp_plant %>% 
   dplyr::select(exotic, nmds_score) %>% 
   unnest(nmds_score) %>% 
   dplyr::mutate(
-    time = rep(c("Past", "Present"), 45),
+    time = rep(c("Past", "Present"), 30),
     time = factor(time, levels = c("Past", "Present"))
     ) %>% 
   
@@ -157,8 +190,14 @@ p_nmds_plant <- comp_plant %>%
   theme(
     axis.title.x = element_blank(),
     panel.grid = element_blank(),
-    legend.position = "none",
-    strip.background = element_blank()
+    strip.background = element_blank(),
+    
+    legend.title = element_blank(),
+    legend.position = c(0.9, 0.89),
+    legend.text = element_text(size = 4),
+    legend.key.height = unit(2.5, "mm"),
+    legend.key.width = unit(2.5, "mm"),
+    legend.background = element_blank()
     )
 
 p_nmds_plant
@@ -209,11 +248,7 @@ p_nmds_bird <- comp_bird %>%
     panel.grid = element_blank(),
     strip.background = element_blank(),
     strip.text = element_blank(),
-    
-    legend.title = element_text(size = 8),
-    legend.background = element_blank(),
-    legend.key.height = unit(5, "mm"),
-    legend.key.width = unit(5, "mm"),
+    legend.position = "none"
   ) 
 
 p_nmds_bird
@@ -227,7 +262,7 @@ p_nmds_butterfly <- comp_butterfly %>%
   dplyr::select(exotic, nmds_score) %>% 
   unnest(nmds_score) %>% 
   dplyr::mutate(
-    time = rep(c("Present", "Past"), 14),
+    time = c(rep(c("Present", "Past"), 7), rep(c("Past", "Present"), 7)),
     time = factor(time, levels = c("Past", "Present"))
   ) %>% 
   
@@ -244,16 +279,16 @@ p_nmds_butterfly <- comp_butterfly %>%
   # Stress value
   geom_text(
     data = label_nmds_butterfly, aes(label = stress), 
-    x = -1.2, y = 1.15, size = 1.3, color = "grey50", hjust = 0) +
+    x = -1.2, y = 0.88, size = 1.3, color = "grey50", hjust = 0) +
   
   # permanova
   geom_text(
     data = label_nmds_butterfly, aes(label = permanova), 
-    x = -1.2, y = 1.0, hjust = 0, size = 1.3, color = "grey50") +
+    x = -1.2, y = 0.8, hjust = 0, size = 1.3, color = "grey50") +
   
   labs(title = "Butterfly") + 
-  #scale_x_continuous(limits = c(-1.1, 1.1)) +
-  scale_y_continuous(limits = c(-1.2, 1.2)) +
+  scale_x_continuous(breaks = seq(-1, 1, length = 3)) +
+  scale_y_continuous(breaks = seq(-0.8, 0.8, length = 3)) +
   scale_color_manual(values = c("#00AFBB", "#E7B800")) +
   scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
   theme_bw(base_size = 7) +
@@ -272,22 +307,12 @@ p_nmds_butterfly
 
 
 ## Combining ---------
-layout_nmds <- "
-AAAAAA
-BBBBDD
-CCCC##
-"
-
-p_nmds <- 
-  p_nmds_plant + p_nmds_bird + p_nmds_butterfly + guide_area() +
-  plot_layout(design = layout_nmds,  guides = "collect",
-              widths = c(1, 2, 2, 1.3)) 
-
+p_nmds <- p_nmds_plant / p_nmds_bird /  p_nmds_butterfly
 
 
 # Save
-ggsave(p_nmds, file = "output/nmds_time.png", 
-       width = 120, height = 125, units = "mm", dpi = 500)
+ggsave(p_nmds, file = "output/nmds_time.pdf", 
+       width = 80, height = 130, units = "mm", dpi = 600)
 
 
 

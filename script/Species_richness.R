@@ -2,6 +2,25 @@
 # Species richness ============================================================
 
 
+# Package ----------------
+pacman::p_load(
+  tidyverse,  # data management
+  lme4, lmerTest, broom, multcomp, #GLM
+  ggeffects, patchwork, ggsci, ggsignif,  # ggplot
+  vegan, iNEXT, betapart, # composition
+  exactRankTests  # wilcoxon test
+)
+
+
+# For read_csv
+options(
+  readr.num_columns = 0L,
+  readr.show_col_types = FALSE,
+  readr.show_progress = FALSE
+)
+
+
+
 ## Estimate a species richness--------------
 
 # Function of estimation for species richness 
@@ -31,8 +50,7 @@ est_sr <- function(x) {
       ) 
 }
 
-
-# Estimate a species richnesss
+# Estimate a species richness
 sr_plant <- est_sr(df_plant)
 sr_bird <- est_sr(df_bird)
 sr_butterfly <- est_sr(df_butterfly)
@@ -65,10 +83,12 @@ test_wicoxon <- function(x) {
     unite(col = char_pval, char, p.value, remove = F, sep = "") 
   } 
 
-
 # Compare a species richness between time
 wlcx_sr_plant <- test_wicoxon(sr_plant) 
-wlcx_sr_bird <- test_wicoxon(sr_bird) %>% filter(exotic != "Exotic species")
+
+wlcx_sr_bird  <- 
+  test_wicoxon(sr_bird) %>% 
+  dplyr::filter(exotic != "Exotic species")
 
 wlcx_sr_butterfy <- 
   test_wicoxon(sr_butterfly) %>% 
@@ -220,11 +240,11 @@ ggsave(box_sr_time, file = "output/box_sr_time.png",
 glm_sr_plant <- sr_plant %>% 
   left_join(env, by = "site") %>% 
   pivot_wider(names_from = time, values_from = sr) %>% 
-  dplyr::mutate(sr = Past - Present) %>% 
+  dplyr::mutate(tem_sr = Present - Past) %>% 
   
   group_nest(exotic) %>% 
   dplyr::mutate(
-    model = map(data, ~ glm(sr ~ year + area + green_rate, data = .)),
+    model = map(data, ~ glm(tem_sr ~ year + area + green_rate, data = .)),
     summary = map(model, ~tidy(.)),
     predict = map(model, ~ggpredict(., terms = "year"))
     )
@@ -234,27 +254,25 @@ glm_sr_plant <- sr_plant %>%
 glm_sr_bird <- sr_bird %>% 
   left_join(env, by = "site") %>% 
   pivot_wider(names_from = time, values_from = sr) %>% 
-  dplyr::mutate(sr = Past - Present) %>% 
-  
+  dplyr::mutate(tem_sr = Present - Past) %>% 
   group_nest(exotic) %>% 
   dplyr::mutate(
-    model = map(data, ~ glm(sr ~ year + area + green_rate, data = .)),
+    model = map(data, ~ glm(tem_sr ~ year + area + green_rate, data = .)),
     summary = map(model, ~tidy(.))
-  )
+    )
 
 
 # Butterfly
 glm_sr_butterfly <- sr_butterfly %>% 
   left_join(env, by = "site") %>% 
   pivot_wider(names_from = time, values_from = sr) %>% 
-  dplyr::mutate(sr = Past - Present) %>% 
+  dplyr::mutate(tem_sr = Present - Past) %>% 
   
   group_nest(exotic) %>% 
   dplyr::mutate(
-    model = map(data, ~ glm(sr ~ year + area + green_rate, data = .)),
+    model = map(data, ~ glm(tem_sr ~ year + area + green_rate, data = .)),
     summary = map(model, ~tidy(.))
   )
-
 
 
 
@@ -286,7 +304,7 @@ tb_glm_sr <- bind_rows(
   tidy_table(glm_sr_bird) %>% dplyr::mutate(species = "Bird"),
   tidy_table(glm_sr_butterfly) %>% dplyr::mutate(species = "Butterfly")
   ) %>% 
-  dplyr::select(species, everything())
+  dplyr::select(species, everything(), -predict)
 
 
 # output for result of GLM
@@ -303,7 +321,7 @@ plot_glm_tempSR_plant <-
   ggplot() + 
   geom_point(
     data = glm_sr_plant %>% unnest(data),
-    aes(year, sr, color = exotic, fill = exotic)
+    aes(year, tem_sr, color = exotic, fill = exotic)
     ) +
   geom_smooth(
     data = glm_sr_plant %>% unnest(predict) %>% 
@@ -322,10 +340,10 @@ plot_glm_tempSR_plant <-
   theme_classic() +
   labs(
     title = "Plant",
-    y = "Temporal species richness"
+    y = "Temporal changes in species richness"
     ) +
   theme(
-    legend.position = c(0.3, 0.85),
+    legend.position = c(0.3, 0.2),
     legend.background = element_blank(),
     legend.title = element_blank(),
     legend.text = element_text(size = 8),
@@ -341,7 +359,7 @@ plot_glm_tempSR_bird <-
   geom_point(
     data = glm_sr_bird %>% unnest(data) %>% 
       dplyr::filter(exotic != "Exotic species"),
-    aes(year, sr, color = exotic, fill = exotic)
+    aes(year, tem_sr, color = exotic, fill = exotic)
   ) +
   scale_color_simpsons() +
   scale_fill_simpsons() +
@@ -361,7 +379,7 @@ plot_glm_tempSR_butterfly <-
   geom_point(
     data = glm_sr_butterfly %>% unnest(data) %>% 
       dplyr::filter(exotic != "Exotic species"),
-    aes(year, sr, color = exotic, fill = exotic)
+    aes(year, tem_sr, color = exotic, fill = exotic)
   ) +
   scale_color_simpsons() +
   scale_fill_simpsons() +
@@ -378,12 +396,11 @@ plot_glm_tempSR_butterfly <-
 plot_glm_tempSR <- 
   plot_glm_tempSR_plant + plot_glm_tempSR_bird + plot_glm_tempSR_butterfly
 
-plot_glm_tempSR
 
 
 # For save
 ggsave(plot_glm_tempSR, file = "output/plot_glm_tempSR.png",
-       width = 180, height = 70, units = "mm", dpi = 600)
+       width = 180, height = 80, units = "mm", dpi = 600)
 
 
 
