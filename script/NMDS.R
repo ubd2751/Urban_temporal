@@ -168,7 +168,7 @@ p_nmds_plant <-
     ) %>% 
   
   ggplot(aes(x = NMDS1, y = NMDS2, color = time)) +
-  geom_point(size = 0.5) +
+  geom_point(size = 0.8) +
   stat_ellipse(
     aes(group = time, fill = time), 
     alpha = 0.1, linewidth = 0.1,
@@ -179,24 +179,24 @@ p_nmds_plant <-
   # Stress value
   geom_text(
     data = label_nmds_plant, aes(label = stress), 
-    x = -1.8, y = 1.8, size = 1.4, color = "grey50", hjust = 0) +
+    x = -1.8, y = 1.8, size = 1.8, color = "grey50", hjust = 0) +
   
   # P value from Permanova
   geom_text(
     data = label_nmds_plant, aes(label = permanova), 
-    x = -1.8, y = 1.62, size = 1.4, color = "grey50", hjust = 0) +
+    x = -1.8, y = 1.6, size = 1.8, color = "grey50", hjust = 0) +
   
   # P-value from Dispersion
   geom_text(
     data = label_nmds_plant, aes(label = dispersion), 
-    x = -1.8, y = 1.44, size = 1.4, color = "grey50", hjust = 0) +
+    x = -1.8, y = 1.4, size = 1.8, color = "grey50", hjust = 0) +
   
   labs(title = "Plant") + 
   scale_x_continuous(limits = c(-1.8, 1.8)) +
   scale_y_continuous(limits = c(-1.8, 1.8)) +
   scale_color_manual(values = c("#00AFBB", "#E7B800")) +
   scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
-  theme_bw(base_size = 8) +
+  theme_bw(base_size = 12) +
   theme(
     axis.title.x = element_blank(),
     panel.grid = element_blank(),
@@ -206,10 +206,10 @@ p_nmds_plant <-
     
     # Legend
     legend.title = element_blank(),
-    legend.position = c(0.82, 0.95),
-    legend.text = element_text(size = 5),
-    legend.key.height = unit(2.5, "mm"),
-    legend.key.width = unit(2.5, "mm"),
+    legend.position = c(0.8, 0.95),
+    legend.text = element_text(size = 7),
+    legend.key.height = unit(3, "mm"),
+    legend.key.width = unit(3, "mm"),
     legend.background = element_blank()
     )
 
@@ -229,7 +229,7 @@ p_nmds_bird <- comp_bird %>%
     ) %>% 
   
   ggplot(aes(x = NMDS1, y = NMDS2, color = time, group = time)) +
-  geom_point(size = 0.5) +
+  geom_point(size = 0.8) +
   stat_ellipse(
     aes(group = time, fill = time), 
     alpha = 0.1, linewidth = 0.1,
@@ -241,17 +241,17 @@ p_nmds_bird <- comp_bird %>%
   # p-value
   geom_text(
     data = label_nmds_bird, aes(label = stress), 
-    x = -2, y = 1.4, hjust = 0, size = 1.4, color = "grey50") +
+    x = -2, y = 1.4, hjust = 0, size = 1.8, color = "grey50") +
   
   # permanova
   geom_text(
     data = label_nmds_bird, aes(label = permanova), 
-    x = -2, y = 1.27, hjust = 0, size = 1.4, color = "grey50") +
+    x = -2, y = 1.25, hjust = 0, size = 1.8, color = "grey50") +
   
   # P-value from Dispersion
   geom_text(
     data = label_nmds_bird, aes(label = dispersion), 
-    x = -2, y = 1.14, hjust = 0, size = 1.4, color = "grey50") +
+    x = -2, y = 1.1, hjust = 0, size = 1.8, color = "grey50") +
   
   
   # adjustment
@@ -261,7 +261,7 @@ p_nmds_bird <- comp_bird %>%
   #scale_y_continuous(breaks = seq(-1, 1, length = 3)) +
   scale_color_manual(values = c("#00AFBB", "#E7B800")) +
   scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
-  theme_bw(base_size = 8) +
+  theme_bw(base_size = 12) +
   theme(
     axis.title.y = element_blank(),
     panel.grid = element_blank(),
@@ -287,7 +287,7 @@ p_nmds_butterfly <- comp_butterfly %>%
   ) %>% 
   
   ggplot(aes(x = NMDS1, y = NMDS2, color = time)) +
-  geom_point(size = 0.5) +
+  geom_point(size = 0.8) +
   stat_ellipse(
     aes(group = time, fill = time), 
     alpha = 0.1, linewidth = 0.1,
@@ -299,17 +299,17 @@ p_nmds_butterfly <- comp_butterfly %>%
   # Stress value
   geom_text(
     data = label_nmds_butterfly, aes(label = stress), 
-    x = -1.25, y = 1, size = 1.4, color = "grey50", hjust = 0) +
+    x = -1.25, y = 1, size = 1.8, color = "grey50", hjust = 0) +
   
   # permanova
   geom_text(
     data = label_nmds_butterfly, aes(label = permanova), 
-    x = -1.25, y = 0.9, size = 1.4, color = "grey50", hjust = 0) +
+    x = -1.25, y = 0.88, size = 1.8, color = "grey50", hjust = 0) +
   
   # P-value from Dispersion
   geom_text(
     data = label_nmds_butterfly, aes(label = dispersion), 
-    x = -1.25, y = 0.8, size = 1.4, color = "grey50", hjust = 0) +
+    x = -1.25, y = 0.76, size = 1.8, color = "grey50", hjust = 0) +
   
   
   labs(title = "Butterfly") + 
@@ -318,7 +318,7 @@ p_nmds_butterfly <- comp_butterfly %>%
   #scale_y_continuous(breaks = seq(-1, 1, length = 3)) +
   scale_color_manual(values = c("#00AFBB", "#E7B800")) +
   scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
-  theme_bw(base_size = 8) +
+  theme_bw(base_size = 12) +
   theme(
     panel.grid = element_blank(),
     legend.position = "none",
