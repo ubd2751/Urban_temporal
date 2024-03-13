@@ -19,6 +19,7 @@ options(
 )
 
 
+
 # data frame for species composition
 df_comp <- function(x) {
   
@@ -40,9 +41,9 @@ df_comp_butterfly <- df_comp(df_butterfly)
 
 
 
-# NMDS & Permanova ----------------------------------------------------------
+# NMDS | Permanova | Dispersion---------------------------------------------
 
-# Function of estimation for nmds, permanova, and dispersion
+## Function of estimation for nmds, permanova, and dispersion
 est_nmds_prmnv <- function(x) {
   
   x %>% 
@@ -94,16 +95,20 @@ est_nmds_prmnv <- function(x) {
       
       # dispersion
       dispersion = map(data, ~betadisper(
-        vegdist(.[,-1:-2], method = "jac"), .$time)
+        vegdist(.[,-1:-2], method = "jac"), .$time, type = "centroid")
         ),
       
       # p-value of dispersion
-      pval_disper = map(dispersion, ~anova(.) %>% dplyr::select("Pr(>F)"))
+      pval_disper = map(dispersion, ~permutest(.) %>% 
+                          pluck("tab") %>% 
+                          as_tibble() %>% 
+                          dplyr::select("Pr(>F)")
+                        )
       )
 }
 
 
-
+# Estimate a nmds, permanova, and dispersion
 comp_plant <- est_nmds_prmnv(df_comp_plant) %>% 
   dplyr::mutate(
     exotic = recode_factor(
@@ -117,21 +122,18 @@ comp_butterfly <- est_nmds_prmnv(df_comp_butterfly)
 
 
 
-comp_plant %>% 
-  dplyr::select(pval_disper) %>% 
-  unnest(pval_disper) 
-  View()
-
-
-
 ## Plot -----------------------------------------------------------------------
 
-## Label for stress value and p-value of permanova
+## Label for stress value and p-value of permanova and dispersion
 label_nmds <- function(x) {
   
   x %>% 
-    dplyr::select(exotic, nmds_stress, pval_perma) %>% 
-    unnest(pval_perma) %>% 
+    dplyr::select(exotic, nmds_stress, pval_perma, pval_disper) %>% 
+    unnest("pval_perma") %>% 
+    na.omit() %>% 
+    rename(perma = `Pr(>F)`) %>% 
+    unnest("pval_disper") %>% 
+    rename(disper = `Pr(>F)`) %>% 
     na.omit() %>% 
     dplyr::mutate(
       across(where(is.numeric), ~round(., digits = 3)),
@@ -141,12 +143,15 @@ label_nmds <- function(x) {
       dispersion_cha = "Dispersion: p = "
     ) %>% 
     unite(stress, stressvalue, nmds_stress, remove = F, sep = "") %>% 
-    unite(permanova, permanova_cha, "Pr(>F)", remove = F, sep = "") 
+    unite(permanova, permanova_cha, perma, remove = F, sep = "") %>% 
+    unite(dispersion, dispersion_cha, disper, remove = F, sep = "")
 }
 
 label_nmds_plant <- label_nmds(comp_plant)
 label_nmds_bird <- label_nmds(comp_bird)
 label_nmds_butterfly <- label_nmds(comp_butterfly)
+
+
 
 
 
@@ -169,17 +174,22 @@ p_nmds_plant <-
     alpha = 0.1, linewidth = 0.1,
     geom = "polygon") +
   
-  facet_wrap(.~exotic) +
+  facet_wrap(exotic~., ncol = 1) +
   
   # Stress value
   geom_text(
     data = label_nmds_plant, aes(label = stress), 
-    x = -1.7, y = 1.7, size = 1.3, color = "grey50", hjust = 0) +
+    x = -1.8, y = 1.8, size = 1.4, color = "grey50", hjust = 0) +
   
   # P value from Permanova
   geom_text(
     data = label_nmds_plant, aes(label = permanova), 
-    x = -1.7, y = 1.5, size = 1.3, color = "grey50", hjust = 0) +
+    x = -1.8, y = 1.62, size = 1.4, color = "grey50", hjust = 0) +
+  
+  # P-value from Dispersion
+  geom_text(
+    data = label_nmds_plant, aes(label = dispersion), 
+    x = -1.8, y = 1.44, size = 1.4, color = "grey50", hjust = 0) +
   
   labs(title = "Plant") + 
   scale_x_continuous(limits = c(-1.8, 1.8)) +
@@ -191,10 +201,13 @@ p_nmds_plant <-
     axis.title.x = element_blank(),
     panel.grid = element_blank(),
     strip.background = element_blank(),
+    strip.text.x = element_text(hjust = 1),
+    plot.title = element_text(hjust = 0, vjust = -5),
     
+    # Legend
     legend.title = element_blank(),
-    legend.position = c(0.9, 0.89),
-    legend.text = element_text(size = 4),
+    legend.position = c(0.82, 0.95),
+    legend.text = element_text(size = 5),
     legend.key.height = unit(2.5, "mm"),
     legend.key.width = unit(2.5, "mm"),
     legend.background = element_blank()
@@ -223,31 +236,38 @@ p_nmds_bird <- comp_bird %>%
     geom = "polygon"
     ) +
   
-  facet_wrap(. ~ exotic) +
+  facet_wrap(exotic~., ncol = 1) +
   
   # p-value
   geom_text(
     data = label_nmds_bird, aes(label = stress), 
-    x = -2, y = 1.25, hjust = 0, size = 1.3, color = "grey50") +
+    x = -2, y = 1.4, hjust = 0, size = 1.4, color = "grey50") +
   
   # permanova
   geom_text(
     data = label_nmds_bird, aes(label = permanova), 
-    x = -2, y = 1.1, hjust = 0, size = 1.3, color = "grey50") +
+    x = -2, y = 1.27, hjust = 0, size = 1.4, color = "grey50") +
+  
+  # P-value from Dispersion
+  geom_text(
+    data = label_nmds_bird, aes(label = dispersion), 
+    x = -2, y = 1.14, hjust = 0, size = 1.4, color = "grey50") +
   
   
   # adjustment
+  ylim(-1.4, 1.4) +
   labs(title = "Bird", fill = "Time", color = "Time") + 
   scale_x_continuous(limits = c(-2, 2)) +
-  scale_y_continuous(breaks = seq(-1, 1, length = 3)) +
+  #scale_y_continuous(breaks = seq(-1, 1, length = 3)) +
   scale_color_manual(values = c("#00AFBB", "#E7B800")) +
   scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
   theme_bw(base_size = 7) +
   theme(
-    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
     panel.grid = element_blank(),
+    plot.title = element_text(hjust = 0, vjust = -5),
     strip.background = element_blank(),
-    strip.text = element_blank(),
+    strip.text.x = element_text(hjust = 1),
     legend.position = "none"
   ) 
 
@@ -262,7 +282,7 @@ p_nmds_butterfly <- comp_butterfly %>%
   dplyr::select(exotic, nmds_score) %>% 
   unnest(nmds_score) %>% 
   dplyr::mutate(
-    time = c(rep(c("Present", "Past"), 7), rep(c("Past", "Present"), 7)),
+    time = c(rep(c("Present", "Past"), 14)),
     time = factor(time, levels = c("Past", "Present"))
   ) %>% 
   
@@ -274,31 +294,40 @@ p_nmds_butterfly <- comp_butterfly %>%
     geom = "polygon"
     ) +
   
-  facet_wrap(. ~ exotic) +
+  facet_wrap(exotic~., ncol = 1) +
   
   # Stress value
   geom_text(
     data = label_nmds_butterfly, aes(label = stress), 
-    x = -1.2, y = 0.88, size = 1.3, color = "grey50", hjust = 0) +
+    x = -1.25, y = 1, size = 1.4, color = "grey50", hjust = 0) +
   
   # permanova
   geom_text(
     data = label_nmds_butterfly, aes(label = permanova), 
-    x = -1.2, y = 0.8, hjust = 0, size = 1.3, color = "grey50") +
+    x = -1.25, y = 0.9, size = 1.4, color = "grey50", hjust = 0) +
+  
+  # P-value from Dispersion
+  geom_text(
+    data = label_nmds_butterfly, aes(label = dispersion), 
+    x = -1.25, y = 0.8, size = 1.4, color = "grey50", hjust = 0) +
+  
   
   labs(title = "Butterfly") + 
+  ylim(c(-1, 1)) +
   scale_x_continuous(breaks = seq(-1, 1, length = 3)) +
-  scale_y_continuous(breaks = seq(-0.8, 0.8, length = 3)) +
+  #scale_y_continuous(breaks = seq(-1, 1, length = 3)) +
   scale_color_manual(values = c("#00AFBB", "#E7B800")) +
   scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
   theme_bw(base_size = 7) +
   theme(
     panel.grid = element_blank(),
     legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    plot.title = element_text(hjust = 0, vjust = -5),
     strip.background = element_blank(),
-    strip.text = element_blank()
+    strip.text.x = element_text(hjust = 1)
     )
-
 
 p_nmds_butterfly
 
@@ -307,12 +336,12 @@ p_nmds_butterfly
 
 
 ## Combining ---------
-p_nmds <- p_nmds_plant / p_nmds_bird /  p_nmds_butterfly
+p_nmds <- p_nmds_plant + p_nmds_bird +  p_nmds_butterfly
 
 
 # Save
-ggsave(p_nmds, file = "output/nmds_time.pdf", 
-       width = 80, height = 130, units = "mm", dpi = 600)
+ggsave(p_nmds, file = "output/nmds_time.png", 
+       width = 140, height = 100, units = "mm", dpi = 600)
 
 
 
