@@ -244,7 +244,7 @@ glm_sr_plant <- sr_plant %>%
   
   group_nest(exotic) %>% 
   dplyr::mutate(
-    model = map(data, ~ glm(tem_sr ~ year + area + green_rate, data = .)),
+    model = map(data, ~ glm(tem_sr ~ year + green_rate + log(area), data = .)),
     summary = map(model, ~tidy(.)),
     predict = map(model, ~ggpredict(., terms = "year"))
     )
@@ -257,7 +257,7 @@ glm_sr_bird <- sr_bird %>%
   dplyr::mutate(tem_sr = Present - Past) %>% 
   group_nest(exotic) %>% 
   dplyr::mutate(
-    model = map(data, ~ glm(tem_sr ~ year + area + green_rate, data = .)),
+    model = map(data, ~ glm(tem_sr ~ year + green_rate + log(area), data = .)),
     summary = map(model, ~tidy(.))
     )
 
@@ -270,7 +270,7 @@ glm_sr_butterfly <- sr_butterfly %>%
   
   group_nest(exotic) %>% 
   dplyr::mutate(
-    model = map(data, ~ glm(tem_sr ~ year + area + green_rate, data = .)),
+    model = map(data, ~ glm(tem_sr ~ year + green_rate + log(area), data = .)),
     summary = map(model, ~tidy(.))
   )
 
@@ -307,8 +307,7 @@ tb_glm_sr <- bind_rows(
   dplyr::select(species, everything(), -predict)
 
 
-# output for result of GLM
-write.csv(tb_glm_sr, "./output/table_glm_sr.csv")
+# write.csv(tb_glm_sr, "./output/table_glm_sr.csv")
 
 
 
