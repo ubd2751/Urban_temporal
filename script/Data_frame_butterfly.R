@@ -78,6 +78,10 @@ df_butterfly <- butterfly %>%
   group_by(site, time, species) %>% 
   dplyr::summarise(value = sum(value), .groups = "drop") %>% 
   dplyr::filter(species != "オオスカシバ") %>% 
+  
+  # exclude a duplication
+  dplyr::group_by(site, time, species) %>% 
+  dplyr::summarise(value = sum(value), .groups = "drop") %>%
   left_join(butterfly_sci, by = "species") %>% 
   dplyr::mutate(
     sci_name = recode(
