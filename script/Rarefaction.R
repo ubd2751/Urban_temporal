@@ -47,7 +47,7 @@ est_inext <- function(x) {
 # Run a iNEXT -------------------------------------------------
 
 ## Plant
-df_plant_trait %>% {
+df_plant %>% {
   
   # All species
   est_inext(.) ->> inext_plant
@@ -98,7 +98,7 @@ p_inext_plant <-
     labs(
       title = "Plant",
       x = "Number of sites",
-      y = "Species richness"
+      y = "All species richness"
       ) +
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
@@ -108,7 +108,6 @@ p_inext_plant <-
       panel.grid = element_blank(),
       plot.subtitle = element_text(hjust = 0.5, size = 10),
       axis.title.x = element_blank(),
-      axis.title.y = element_blank(),
       legend.position = "none"
       )
 
@@ -119,7 +118,7 @@ p_inext_plant_n <-
     labs(
       title = "",
       x = "Number of sites",
-      y = "Species richness"
+      y = "Native species richness"
     ) +
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
@@ -129,7 +128,6 @@ p_inext_plant_n <-
       panel.grid = element_blank(),
       plot.subtitle = element_text(hjust = 0.5, size = 10),
       axis.title.x = element_blank(),
-      axis.title.y = element_blank(),
       legend.position = "none"
       )
 
@@ -283,15 +281,15 @@ legend_inext <- p_legend %>%
 
 
 # Axis label
-bottom <- grid::textGrob("Number of sites", gp = gpar(fontsize = 12))
+#bottom <- grid::textGrob("Number of sites", gp = gpar(fontsize = 12))
 y_left <- grid::textGrob("Species richness", gp = gpar(fontsize = 12), rot = 90)
 
 grid.arrange(
-  p_inext_plant, p_inext_plant_n, p_inext_plant_e,
-  p_inext_bird, p_inext_bird_n, legend_inext,
-  p_inext_butterfly, p_inext_butterfly_n,
-  nrow = 3,
-  left = y_left, bottom = bottom,
+  p_inext_plant,  p_inext_bird, p_inext_butterfly,
+  p_inext_plant_n, p_inext_bird_n, p_inext_butterfly_n,
+  legend_inext,
+  nrow = 2,
+  bottom = bottom,
   layout_matrix = rbind(c(1, 2, 3),
                         c(4, 5, 6),
                         c(7, 8, NA))
