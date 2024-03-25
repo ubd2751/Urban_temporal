@@ -122,6 +122,9 @@ comp_butterfly <- est_nmds_prmnv(df_comp_butterfly)
 
 
 
+
+
+
 ## Plot -----------------------------------------------------------------------
 
 ## Label for stress value and p-value of permanova and dispersion
@@ -150,7 +153,6 @@ label_nmds <- function(x) {
 label_nmds_plant <- label_nmds(comp_plant)
 label_nmds_bird <- label_nmds(comp_bird)
 label_nmds_butterfly <- label_nmds(comp_butterfly)
-
 
 
 
@@ -196,7 +198,7 @@ p_nmds_plant <-
   scale_y_continuous(limits = c(-1.8, 1.8)) +
   scale_color_manual(values = c("#00AFBB", "#E7B800")) +
   scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
-  theme_bw(base_size = 12) +
+  theme_bw(base_size = 8) +
   theme(
     axis.title.x = element_blank(),
     panel.grid = element_blank(),
@@ -261,7 +263,7 @@ p_nmds_bird <- comp_bird %>%
   #scale_y_continuous(breaks = seq(-1, 1, length = 3)) +
   scale_color_manual(values = c("#00AFBB", "#E7B800")) +
   scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
-  theme_bw(base_size = 12) +
+  theme_bw(base_size = 8) +
   theme(
     axis.title.y = element_blank(),
     panel.grid = element_blank(),
@@ -318,7 +320,7 @@ p_nmds_butterfly <- comp_butterfly %>%
   #scale_y_continuous(breaks = seq(-1, 1, length = 3)) +
   scale_color_manual(values = c("#00AFBB", "#E7B800")) +
   scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
-  theme_bw(base_size = 12) +
+  theme_bw(base_size = 8) +
   theme(
     panel.grid = element_blank(),
     legend.position = "none",
@@ -335,18 +337,11 @@ p_nmds_butterfly
 
 
 
-## Combining ---------
+## Combine ---------
 p_nmds <- p_nmds_plant + p_nmds_bird +  p_nmds_butterfly
 
 
 # Save
 ggsave(p_nmds, file = "output/nmds_time.png", 
        width = 180, height = 120, units = "mm", dpi = 600)
-
-
-
-
-
-
-
 

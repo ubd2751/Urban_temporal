@@ -10,8 +10,6 @@ pacman::p_load(
   )
 
 
-x = df_bird
-x = df_butterfly
 
 # Function of iNEXT -------------------------
 est_inext <- function(x) {
@@ -92,6 +90,7 @@ df_butterfly %>% {
 
 ## Plot --------------------------------------------------------
 
+
 # Plant
 p_inext_plant <-
   ggiNEXT(inext_plant) +
@@ -103,7 +102,7 @@ p_inext_plant <-
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
     scale_x_continuous(limits = c(0, 30)) +
-    theme_bw(base_size = 12) +
+    theme_bw(base_size = 8) +
     theme(
       panel.grid = element_blank(),
       plot.subtitle = element_text(hjust = 0.5, size = 10),
@@ -117,17 +116,17 @@ p_inext_plant_n <-
   ggiNEXT(inext_plant_n) +
     labs(
       title = "",
-      x = "Number of sites",
+      x = "",
       y = "Native species richness"
     ) +
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
     scale_x_continuous(limits = c(0, 30)) +
-    theme_bw(base_size = 12) +
+    theme_bw(base_size = 8) +
     theme(
       panel.grid = element_blank(),
       plot.subtitle = element_text(hjust = 0.5, size = 10),
-      axis.title.x = element_blank(),
+      #axis.title.x = element_blank(),
       legend.position = "none"
       )
 
@@ -144,7 +143,7 @@ p_inext_plant_e <-
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
     #scale_y_continuous(limits = c(0, 1500)) +
-    theme_bw(base_size = 12) +
+    theme_bw(base_size = 8) +
     theme(
       panel.grid = element_blank(),
       plot.subtitle = element_text(hjust = 0.5, size = 10),
@@ -167,7 +166,7 @@ p_inext_bird <-
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
     scale_x_continuous(limits = c(0, 15)) +
-    theme_bw(base_size = 12) +
+    theme_bw(base_size = 8) +
     theme(
       panel.grid = element_blank(),
       axis.title.x = element_blank(),
@@ -188,10 +187,10 @@ p_inext_bird_n <-
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
     scale_x_continuous(limits = c(0, 15)) +
-    theme_bw(base_size = 12) +
+    theme_bw(base_size = 8) +
     theme(
       panel.grid = element_blank(),
-      axis.title.x = element_blank(),
+      #axis.title.x = element_blank(),
       axis.title.y = element_blank(),
       legend.position = "none"
       )
@@ -209,7 +208,7 @@ p_inext_butterfly <-
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
     scale_x_continuous(limits = c(0, 15)) +
-    theme_bw(base_size = 12) +
+    theme_bw(base_size = 8) +
     theme(
       panel.grid = element_blank(),
       axis.title.x = element_blank(),
@@ -223,16 +222,16 @@ p_inext_butterfly_n <-
   ggiNEXT(inext_butterfly_n) +
   labs(
     title = "",
-    x = "Number of sites",
+    x = "",
     y = "Species richness"
   ) +
   scale_color_manual(values = c("#00AFBB", "#E7B800")) +
   scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
   scale_x_continuous(limits = c(0, 15)) +
-  theme_bw(base_size = 12) +
+  theme_bw(base_size = 8) +
   theme(
     panel.grid = element_blank(),
-    axis.title.x = element_blank(),
+    #axis.title.x = element_blank(),
     axis.title.y = element_blank(),
     legend.position = "none"
     )
@@ -273,7 +272,7 @@ p_legend <- inext_butterfly_n %>%
   theme(
     legend.direction = "vertical",
     legend.text = element_text(size = 8),
-    legend.key.size = unit(0.7, 'cm'))
+    legend.key.size = unit(0.5, 'cm'))
 
 legend_inext <- p_legend %>% 
   ggpubr::get_legend() %>% 
@@ -281,18 +280,19 @@ legend_inext <- p_legend %>%
 
 
 # Axis label
-#bottom <- grid::textGrob("Number of sites", gp = gpar(fontsize = 12))
-y_left <- grid::textGrob("Species richness", gp = gpar(fontsize = 12), rot = 90)
+bottom <- grid::textGrob("Number of sites", gp = gpar(fontsize = 10))
+y_left <- grid::textGrob("Species richness", gp = gpar(fontsize = 10), rot = 90)
 
 grid.arrange(
   p_inext_plant,  p_inext_bird, p_inext_butterfly,
   p_inext_plant_n, p_inext_bird_n, p_inext_butterfly_n,
   legend_inext,
   nrow = 2,
-  bottom = bottom,
-  layout_matrix = rbind(c(1, 2, 3),
-                        c(4, 5, 6),
-                        c(7, 8, NA))
+  #bottom = bottom,
+  layout_matrix = rbind(c(1, 2, 3, 7),
+                        c(4, 5, 6, 7)),
+  widths = c(1.05, 1, 0.95, 0.7),
+  heights = c(0.95, 1)
   ) 
 
 
@@ -300,16 +300,17 @@ grid.arrange(
 # For save
 ggsave(
   grid.arrange(
-    p_inext_plant, p_inext_plant_n, p_inext_plant_e,
-    p_inext_bird, p_inext_bird_n, legend_inext,
-    p_inext_butterfly, p_inext_butterfly_n,
-    nrow = 3,
-    left = y_left, bottom = bottom,
-    layout_matrix = rbind(c(1, 2, 3),
-                          c(4, 5, 6),
-                          c(7, 8, NA))), 
-  file = "output/iNEXT.pdf", 
-  width = 180, height = 180, units = "mm", dpi = 600)
+    p_inext_plant,  p_inext_bird, p_inext_butterfly,
+    p_inext_plant_n, p_inext_bird_n, p_inext_butterfly_n,
+    legend_inext,
+    nrow = 2,
+    layout_matrix = rbind(c(1, 2, 3, 7),
+                          c(4, 5, 6, 7)),
+    widths = c(1.1, 1, 0.95, 0.7),
+    heights = c(0.95, 1)
+    ), 
+  file = "output/iNEXT.png", 
+  width = 180, height = 100, units = "mm", dpi = 800)
 
 
 

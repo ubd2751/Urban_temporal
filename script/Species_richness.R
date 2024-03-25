@@ -319,7 +319,8 @@ tb_glm_sr <- bind_rows(
 plot_glm_tempSR_plant <- 
   ggplot() + 
   geom_point(
-    data = glm_sr_plant %>% unnest(data),
+    data = glm_sr_plant %>% unnest(data)  %>% 
+      dplyr::filter(exotic != "Exotic species"),
     aes(year, tem_sr, color = exotic, fill = exotic)
     ) +
   geom_smooth(
