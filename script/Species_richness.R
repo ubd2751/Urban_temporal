@@ -244,7 +244,7 @@ glm_sr_plant <- sr_plant %>%
   
   group_nest(exotic) %>% 
   dplyr::mutate(
-    model = map(data, ~ glm(tem_sr ~ year + green_rate + log(area), data = .)),
+    model = map(data, ~ glm(tem_sr ~ year + green_rate + area, data = .)),
     summary = map(model, ~tidy(.)),
     predict = map(model, ~ggpredict(., terms = "year"))
     )
@@ -257,7 +257,7 @@ glm_sr_bird <- sr_bird %>%
   dplyr::mutate(tem_sr = Present - Past) %>% 
   group_nest(exotic) %>% 
   dplyr::mutate(
-    model = map(data, ~ glm(tem_sr ~ year + green_rate + log(area), data = .)),
+    model = map(data, ~ glm(tem_sr ~ year + green_rate + area, data = .)),
     summary = map(model, ~tidy(.))
     )
 
@@ -270,7 +270,7 @@ glm_sr_butterfly <- sr_butterfly %>%
   
   group_nest(exotic) %>% 
   dplyr::mutate(
-    model = map(data, ~ glm(tem_sr ~ year + green_rate + log(area), data = .)),
+    model = map(data, ~ glm(tem_sr ~ year + green_rate + area, data = .)),
     summary = map(model, ~tidy(.))
   )
 
@@ -307,7 +307,8 @@ tb_glm_sr <- bind_rows(
   dplyr::select(species, everything(), -predict)
 
 
-# write.csv(tb_glm_sr, "./output/table_glm_sr.csv")
+#
+write.csv(tb_glm_sr, "./output/table_glm_sr.csv")
 
 
 
@@ -335,20 +336,21 @@ plot_glm_tempSR_plant <-
     alpha = 0.2
     ) +
   
-  scale_color_simpsons() +
-  scale_fill_simpsons() +
-  theme_classic() +
+  scale_color_npg() +
+  scale_fill_npg() +
+  theme_bw(base_size = 10) +
   labs(
     title = "Plant",
     y = "Temporal changes in species richness"
     ) +
   theme(
-    legend.position = c(0.3, 0.2),
+    legend.position = c(0.7, 0.9),
     legend.background = element_blank(),
     legend.title = element_blank(),
     legend.text = element_text(size = 8),
     legend.key.size = unit(5, "mm"),
-    axis.title.x = element_blank()
+    axis.title.x = element_blank(),
+    panel.grid = element_blank()
   )
 
 
@@ -361,15 +363,16 @@ plot_glm_tempSR_bird <-
       dplyr::filter(exotic != "Exotic species"),
     aes(year, tem_sr, color = exotic, fill = exotic)
   ) +
-  scale_color_simpsons() +
-  scale_fill_simpsons() +
-  theme_classic() +
+  scale_color_npg() +
+  scale_fill_npg() +
+  theme_bw(base_size = 10) +
   labs(
     title = "Bird",
     x = "Years between surveys") +
   theme(
     legend.position = "none",
-    axis.title.y = element_blank()
+    axis.title.y = element_blank(),
+    panel.grid = element_blank()
   )
 
 
@@ -381,14 +384,15 @@ plot_glm_tempSR_butterfly <-
       dplyr::filter(exotic != "Exotic species"),
     aes(year, tem_sr, color = exotic, fill = exotic)
   ) +
-  scale_color_simpsons() +
-  scale_fill_simpsons() +
-  theme_classic() +
+  scale_color_npg() +
+  scale_fill_npg() +
+  theme_bw(base_size = 10) +
   labs(title = "Butterfly") +
   theme(
     legend.position = "none",
     axis.title.y = element_blank(),
-    axis.title.x = element_blank()
+    axis.title.x = element_blank(),
+    panel.grid = element_blank()
   )
 
   
@@ -400,7 +404,7 @@ plot_glm_tempSR <-
 
 # For save
 ggsave(plot_glm_tempSR, file = "output/plot_glm_tempSR.png",
-       width = 180, height = 80, units = "mm", dpi = 600)
+       width = 180, height = 80, units = "mm", dpi = 800)
 
 
 

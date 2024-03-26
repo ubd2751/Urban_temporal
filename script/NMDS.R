@@ -198,7 +198,7 @@ p_nmds_plant <-
   scale_y_continuous(limits = c(-1.8, 1.8)) +
   scale_color_manual(values = c("#00AFBB", "#E7B800")) +
   scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
-  theme_bw(base_size = 8) +
+  theme_bw(base_size = 9) +
   theme(
     axis.title.x = element_blank(),
     panel.grid = element_blank(),
@@ -263,7 +263,7 @@ p_nmds_bird <- comp_bird %>%
   #scale_y_continuous(breaks = seq(-1, 1, length = 3)) +
   scale_color_manual(values = c("#00AFBB", "#E7B800")) +
   scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
-  theme_bw(base_size = 8) +
+  theme_bw(base_size = 9) +
   theme(
     axis.title.y = element_blank(),
     panel.grid = element_blank(),
@@ -273,7 +273,6 @@ p_nmds_bird <- comp_bird %>%
     legend.position = "none"
   ) 
 
-p_nmds_bird
 
 
 
@@ -320,7 +319,7 @@ p_nmds_butterfly <- comp_butterfly %>%
   #scale_y_continuous(breaks = seq(-1, 1, length = 3)) +
   scale_color_manual(values = c("#00AFBB", "#E7B800")) +
   scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
-  theme_bw(base_size = 8) +
+  theme_bw(base_size = 9) +
   theme(
     panel.grid = element_blank(),
     legend.position = "none",
@@ -331,7 +330,7 @@ p_nmds_butterfly <- comp_butterfly %>%
     strip.text.x = element_text(hjust = 1)
     )
 
-p_nmds_butterfly
+
 
 
 
