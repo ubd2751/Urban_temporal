@@ -244,7 +244,7 @@ glm_sr_plant <- sr_plant %>%
   
   group_nest(exotic) %>% 
   dplyr::mutate(
-    model = map(data, ~ glm(tem_sr ~ year + green_rate + log(area), data = .)),
+    model = map(data, ~ glm(tem_sr ~ year + green_rate + area, data = .)),
     summary = map(model, ~tidy(.)),
     predict = map(model, ~ggpredict(., terms = "year"))
     )
@@ -257,7 +257,7 @@ glm_sr_bird <- sr_bird %>%
   dplyr::mutate(tem_sr = Present - Past) %>% 
   group_nest(exotic) %>% 
   dplyr::mutate(
-    model = map(data, ~ glm(tem_sr ~ year + green_rate + log(area), data = .)),
+    model = map(data, ~ glm(tem_sr ~ year + green_rate + area, data = .)),
     summary = map(model, ~tidy(.))
     )
 
@@ -270,7 +270,7 @@ glm_sr_butterfly <- sr_butterfly %>%
   
   group_nest(exotic) %>% 
   dplyr::mutate(
-    model = map(data, ~ glm(tem_sr ~ year + green_rate + log(area), data = .)),
+    model = map(data, ~ glm(tem_sr ~ year + green_rate + area, data = .)),
     summary = map(model, ~tidy(.))
   )
 
@@ -307,7 +307,8 @@ tb_glm_sr <- bind_rows(
   dplyr::select(species, everything(), -predict)
 
 
-# write.csv(tb_glm_sr, "./output/table_glm_sr.csv")
+#
+write.csv(tb_glm_sr, "./output/table_glm_sr.csv")
 
 
 
@@ -337,7 +338,11 @@ plot_glm_tempSR_plant <-
   
   scale_color_npg() +
   scale_fill_npg() +
+<<<<<<< HEAD
   theme_bw() +
+=======
+  theme_bw(base_size = 10) +
+>>>>>>> 5e6ed18233da2f9805af9aff4c5c3079bab467a6
   labs(
     title = "Plant",
     y = "Temporal changes in species richness"
@@ -349,8 +354,11 @@ plot_glm_tempSR_plant <-
     legend.text = element_text(size = 8),
     legend.key.size = unit(5, "mm"),
     axis.title.x = element_blank(),
+<<<<<<< HEAD
     strip.placement = "outside",
     strip.background = element_blank(),
+=======
+>>>>>>> 5e6ed18233da2f9805af9aff4c5c3079bab467a6
     panel.grid = element_blank()
   )
 
@@ -366,15 +374,22 @@ plot_glm_tempSR_bird <-
   ) +
   scale_color_npg() +
   scale_fill_npg() +
+<<<<<<< HEAD
   theme_bw() +
+=======
+  theme_bw(base_size = 10) +
+>>>>>>> 5e6ed18233da2f9805af9aff4c5c3079bab467a6
   labs(
     title = "Bird",
     x = "Years between surveys") +
   theme(
     legend.position = "none",
     axis.title.y = element_blank(),
+<<<<<<< HEAD
     strip.placement = "outside",
     strip.background = element_blank(),
+=======
+>>>>>>> 5e6ed18233da2f9805af9aff4c5c3079bab467a6
     panel.grid = element_blank()
   )
 
@@ -389,14 +404,21 @@ plot_glm_tempSR_butterfly <-
   ) +
   scale_color_npg() +
   scale_fill_npg() +
+<<<<<<< HEAD
   theme_bw() +
+=======
+  theme_bw(base_size = 10) +
+>>>>>>> 5e6ed18233da2f9805af9aff4c5c3079bab467a6
   labs(title = "Butterfly") +
   theme(
     legend.position = "none",
     axis.title.y = element_blank(),
     axis.title.x = element_blank(),
+<<<<<<< HEAD
     strip.placement = "outside",
     strip.background = element_blank(),
+=======
+>>>>>>> 5e6ed18233da2f9805af9aff4c5c3079bab467a6
     panel.grid = element_blank()
   )
 
@@ -409,7 +431,7 @@ plot_glm_tempSR <-
 
 # For save
 ggsave(plot_glm_tempSR, file = "output/plot_glm_tempSR.png",
-       width = 180, height = 80, units = "mm", dpi = 600)
+       width = 180, height = 80, units = "mm", dpi = 800)
 
 
 
