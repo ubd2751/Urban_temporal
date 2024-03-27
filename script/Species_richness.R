@@ -338,11 +338,7 @@ plot_glm_tempSR_plant <-
   
   scale_color_npg() +
   scale_fill_npg() +
-<<<<<<< HEAD
-  theme_bw() +
-=======
   theme_bw(base_size = 10) +
->>>>>>> 5e6ed18233da2f9805af9aff4c5c3079bab467a6
   labs(
     title = "Plant",
     y = "Temporal changes in species richness"
@@ -354,13 +350,10 @@ plot_glm_tempSR_plant <-
     legend.text = element_text(size = 8),
     legend.key.size = unit(5, "mm"),
     axis.title.x = element_blank(),
-<<<<<<< HEAD
     strip.placement = "outside",
     strip.background = element_blank(),
-=======
->>>>>>> 5e6ed18233da2f9805af9aff4c5c3079bab467a6
     panel.grid = element_blank()
-  )
+    )
 
 
 
@@ -374,24 +367,17 @@ plot_glm_tempSR_bird <-
   ) +
   scale_color_npg() +
   scale_fill_npg() +
-<<<<<<< HEAD
-  theme_bw() +
-=======
   theme_bw(base_size = 10) +
->>>>>>> 5e6ed18233da2f9805af9aff4c5c3079bab467a6
   labs(
     title = "Bird",
     x = "Years between surveys") +
   theme(
     legend.position = "none",
     axis.title.y = element_blank(),
-<<<<<<< HEAD
     strip.placement = "outside",
     strip.background = element_blank(),
-=======
->>>>>>> 5e6ed18233da2f9805af9aff4c5c3079bab467a6
     panel.grid = element_blank()
-  )
+    )
 
 
 # Butterfly
@@ -404,21 +390,14 @@ plot_glm_tempSR_butterfly <-
   ) +
   scale_color_npg() +
   scale_fill_npg() +
-<<<<<<< HEAD
-  theme_bw() +
-=======
   theme_bw(base_size = 10) +
->>>>>>> 5e6ed18233da2f9805af9aff4c5c3079bab467a6
   labs(title = "Butterfly") +
   theme(
     legend.position = "none",
     axis.title.y = element_blank(),
     axis.title.x = element_blank(),
-<<<<<<< HEAD
     strip.placement = "outside",
     strip.background = element_blank(),
-=======
->>>>>>> 5e6ed18233da2f9805af9aff4c5c3079bab467a6
     panel.grid = element_blank()
   )
 

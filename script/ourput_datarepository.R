@@ -32,8 +32,8 @@ df_plant %>%
 
 # Bird
 df_bird %>% 
-  dplyr::select(site, time, sciname, value, exotic, Beak.Length_Culmen, 
-                "Hand-Wing.Index", Mass) %>% 
+  dplyr::select(site, time, sciname, value, exotic, species,
+                Beak.Length_Culmen, "Hand-Wing.Index", Mass) %>% 
   dplyr::filter(value == 1) %>% 
   dplyr::mutate(
     site = recode(
@@ -53,8 +53,12 @@ df_bird %>%
       "流山市1" = "N1",
       "流山市2" = "N2",
       "流山市3" = "N3"
-      )
+      ),
+    sciname = if_else(species == "アイガモ", 
+                      "Anas platyrhynchos var.domesticus",
+                      sciname)
     ) %>% 
+  dplyr::select(-species) %>% 
   write.csv("./output/df_bird_output.csv")
 
 

@@ -266,30 +266,28 @@ plot_glm_tempbeta <-
     aes(x, ymin = conf.low, ymax = conf.high, fill = exotic),
     alpha = 0.1
     ) +
-  facet_grid(. ~ species, switch = "y") +
+  facet_grid(.~ species, scales = "free") +
   scale_y_continuous(breaks = seq(0, 0.9, length = 4))+
   scale_color_npg(labels = c(All = "All species",
                              Native = "Native species")) +
   scale_fill_npg(labels = c(All = "All species",
                             Native = "Native species")) +
-
-  labs(
-    x = "Years between surveys",
-    y = "Temporal beta diversity"
-    ) +
-  theme_bw(base_size = 13) +
+  labs(x = "Years between surveys",
+       y = "Temporal beta diversity") +
+  theme_bw(base_size = 10) +
   theme(
-    legend.position = c(0.9, 0.9),
+    legend.position = c(0.09, 0.9),
     legend.background = element_blank(),
     legend.title = element_blank(),
-    legend.text = element_text(size = 8),
+    legend.text = element_text(size = 7),
     legend.key.size = unit(5, "mm"),
     strip.placement = "outside",
     strip.background = element_blank(),
+    strip.text = element_text(size = 10),
+    strip.text.x = element_text(hjust = 0), 
     panel.grid = element_blank()
     )
 
 
 ggsave(plot_glm_tempbeta, file = "output/plot_glm_tempbeta.png",
-       width = 170, height = 80, units = "mm", dpi = 600)
-
+       width = 180, height = 80, units = "mm", dpi = 800)

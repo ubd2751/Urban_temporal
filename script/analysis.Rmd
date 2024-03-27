@@ -1,13 +1,13 @@
 ---
-title: "Temporal biotic homogenisation patterns vary with taxa"
+title:"Temporal biotic homogenisation patterns vary with taxa"
 date: "`r Sys.Date()`"
 output:
-  rmdformats::html_clean:
-    highlight: kate
+  html_document:
     toc: TRUE
     toc_depth: 2
     toc_float: TRUE
-    number_sections: TRUE
+  rmdformats::html_clean:
+    highlight: kate
 ---
 
 ```{r setup, include=FALSE}
@@ -31,13 +31,38 @@ pacman::p_load(
 
 
 ## load data
-```{r}
-df_plant     <- read_csv("data/df_plant_output.csv", show_col_types = FALSE)
-df_bird      <- read_csv("data/df_bird_output.csv", show_col_types = FALSE)
-df_butterfly <- read_csv("data/df_butterfly_output.csv", show_col_types = FALSE)
+```{r message=FALSE, warning=FALSE}
+# plant
+df_plant <- read_csv(
+  "data/df_plant_output.csv", 
+  locale = locale(encoding = "cp932"),
+  show_col_types = FALSE
+  )
+
+# bird
+df_bird <- read_csv(
+  "data/df_bird_output.csv", 
+  locale = locale(encoding = "cp932"),
+  show_col_types = FALSE
+  )
+
+# butterfly
+df_butterfly <- read_csv(
+  "data/df_butterfly_output.csv", 
+  locale = locale(encoding = "cp932"),
+  show_col_types = FALSE
+  )
+
+# environment
+df_env <- read_csv(
+  "data/df_env_output.csv", 
+  locale = locale(encoding = "cp932"),
+  show_col_types = FALSE
+  )
 ```
 
-# Fig. 1
+# Fig. 1 
+Comparison of regional species richness between past and present using rare faction curves
 
 ## Rarafaction curve
 Function of iNEXT 
@@ -221,7 +246,7 @@ p_inext_butterfly_n <-
 ```
 
 Plot combine
-```{r warning=FALSE}
+```{r message=FALSE, warning=FALSE, fig.width=10, fig.height=8}
 # Extract a legend
 p_legend <- inext_butterfly_n %>% 
   ggiNEXT() + 
@@ -250,7 +275,828 @@ grid.arrange(
   ) 
 ```
 
+# Fig. 2
+Comparison of species composition between past and present using NMDS
+
+## data frame for species composition
+```{r}
+df_comp <- function(x) {
+  
+  x %>% 
+    dplyr::filter(value == 1) %>% 
+    dplyr::select(site, time, exotic, sciname, value) %>% 
+    pivot_wider(
+      names_from = sciname, 
+      values_from = value,
+      values_fill = 0
+      )
+} 
 
 
+df_comp_plant     <- df_comp(df_plant) 
+df_comp_bird      <- df_comp(df_bird) 
+df_comp_butterfly <- df_comp(df_butterfly) 
+```
+
+## NMDS | Permanova | Dispersion
+
+Function of estimation for nmds, permanova, and dispersion
+```{r}
+est_nmds_prmnv <- function(x) {
+  
+  x %>% 
+    dplyr::group_by(site, time) %>% 
+    dplyr::summarise(across(where(is.numeric), sum), .groups = "drop") %>% 
+    dplyr::mutate(exotic = "All") %>% 
+    dplyr::select(site, time, exotic, everything()) %>% 
+    dplyr::bind_rows(x) %>% 
+    group_nest(exotic) %>% 
+    
+    # if data is plant, adding a #
+    dplyr::filter(exotic != "Exotic") %>% 
+    
+    
+    dplyr::mutate(
+      
+      # Rename
+      exotic = recode_factor(
+        exotic, 
+        "All" = "All species",
+        "Native" = "Native species"),
+      
+      # Remove columns with a total of 0
+      comp = map(
+        data,
+        ~ dplyr::select(., where(~ is.numeric(.) && sum(.) != 0))),
+      
+      # Jaccard dissimilarity
+      jac = map(comp, ~vegdist(., method = "jac")),
+      
+      # NMDS
+      nmds = map(
+        comp, 
+        ~ metaMDS(., dist = "jac", k = 2, trace = F, trymax = 999)),
+      
+      # NMDS axis score
+      nmds_score = map(nmds, ~scores(.) %>% pluck(1) %>% as.data.frame()),
+      
+      # NMDS stress value
+      nmds_stress = map_dbl(nmds, ~.$stress),
+      
+      
+      # permanova
+      permanova = map(data, ~adonis2(.[,-1:-2] ~ .$time, method = "jac")),
+      
+      # p-value of permanova
+      pval_perma = map(permanova, ~as_tibble(.) %>% dplyr::select("Pr(>F)")),
+      
+      
+      # dispersion
+      dispersion = map(data, ~betadisper(
+        vegdist(.[,-1:-2], method = "jac"), .$time)
+        ),
+      
+      # p-value of dispersion
+      pval_disper = map(dispersion, ~permutest(.) %>% 
+                          pluck("tab") %>% 
+                          as_tibble() %>% 
+                          dplyr::select("Pr(>F)")
+                        )
+      )
+}
+```
+
+Estimate NMDS, permanova, and dispersion
+```{r}
+# plant
+comp_plant <- est_nmds_prmnv(df_comp_plant) %>% 
+  dplyr::mutate(
+    exotic = recode_factor(
+      exotic, 
+      "All species" = "All species",
+      "Native species" = "Native species")
+    )
+
+# bird
+comp_bird <- est_nmds_prmnv(df_comp_bird)
+
+
+# butterfly
+comp_butterfly <- est_nmds_prmnv(df_comp_butterfly)
+```
+
+## plot for NMDS
+Label for stress value and p-value of permanova and dispersion
+```{r}
+label_nmds <- function(x) {
+  
+  x %>% 
+    dplyr::select(exotic, nmds_stress, pval_perma, pval_disper) %>% 
+    unnest("pval_perma") %>% 
+    na.omit() %>% 
+    rename(perma = `Pr(>F)`) %>% 
+    unnest("pval_disper") %>% 
+    rename(disper = `Pr(>F)`) %>% 
+    na.omit() %>% 
+    dplyr::mutate(
+      across(where(is.numeric), ~round(., digits = 3)),
+      time = "Past",
+      stressvalue = "Stress value:",
+      permanova_cha = "Permanova: p = ",
+      dispersion_cha = "Dispersion: p = "
+    ) %>% 
+    unite(stress, stressvalue, nmds_stress, remove = F, sep = "") %>% 
+    unite(permanova, permanova_cha, perma, remove = F, sep = "") %>% 
+    unite(dispersion, dispersion_cha, disper, remove = F, sep = "")
+}
+
+label_nmds_plant <- label_nmds(comp_plant)
+label_nmds_bird <- label_nmds(comp_bird)
+label_nmds_butterfly <- label_nmds(comp_butterfly)
+```
+
+Plot for NMDS
+```{r fig.width=10, fig.height=8}
+# Plant
+p_nmds_plant <- comp_plant %>% 
+  dplyr::select(exotic, nmds_score) %>% 
+  unnest(nmds_score) %>% 
+  dplyr::mutate(
+    time = rep(c("Past", "Present"), 30),
+    time = factor(time, levels = c("Past", "Present"))
+    ) %>% 
+  
+  ggplot(aes(x = NMDS1, y = NMDS2, color = time)) +
+  geom_point(size = 0.8) +
+  stat_ellipse(
+    aes(group = time, fill = time), 
+    alpha = 0.1, linewidth = 0.1,
+    geom = "polygon") +
+  
+  facet_wrap(exotic~., ncol = 1) +
+  
+  # Stress value
+  geom_text(
+    data = label_nmds_plant, aes(label = stress), 
+    x = -1.8, y = 1.8, size = 1.8, color = "grey50", hjust = 0) +
+  
+  # P value from Permanova
+  geom_text(
+    data = label_nmds_plant, aes(label = permanova), 
+    x = -1.8, y = 1.6, size = 1.8, color = "grey50", hjust = 0) +
+  
+  # P-value from Dispersion
+  geom_text(
+    data = label_nmds_plant, aes(label = dispersion), 
+    x = -1.8, y = 1.4, size = 1.8, color = "grey50", hjust = 0) +
+  
+  labs(title = "Plant") + 
+  scale_x_continuous(limits = c(-1.8, 1.8)) +
+  scale_y_continuous(limits = c(-1.8, 1.8)) +
+  scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+  scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
+  theme_bw(base_size = 8) +
+  theme(
+    axis.title.x = element_blank(),
+    panel.grid = element_blank(),
+    strip.background = element_blank(),
+    strip.text.x = element_text(hjust = 1),
+    plot.title = element_text(hjust = 0, vjust = -5),
+    
+    # Legend
+    legend.title = element_blank(),
+    legend.position = c(0.8, 0.95),
+    legend.text = element_text(size = 7),
+    legend.key.height = unit(3, "mm"),
+    legend.key.width = unit(3, "mm"),
+    legend.background = element_blank()
+    )
+
+
+
+
+# Bird
+p_nmds_bird <- 
+  comp_bird %>% 
+  dplyr::select(exotic, nmds_score) %>% 
+  unnest(nmds_score) %>% 
+  dplyr::mutate(
+    time = c(rep(c("Present", "Past"), 7), rep(c("Past", "Present"), 7)),
+    time = factor(time, levels = c("Past", "Present"))
+    ) %>% 
+  
+  ggplot(aes(x = NMDS1, y = NMDS2, color = time, group = time)) +
+  geom_point(size = 0.8) +
+  stat_ellipse(
+    aes(group = time, fill = time), 
+    alpha = 0.1, linewidth = 0.1,
+    geom = "polygon"
+    ) +
+  
+  facet_wrap(exotic~., ncol = 1, scale = "free") +
+  
+  # p-value
+  geom_text(
+    data = label_nmds_bird, aes(label = stress), 
+    x = -2, y = 1.4, hjust = 0, size = 1.8, color = "grey50") +
+  
+  # permanova
+  geom_text(
+    data = label_nmds_bird, aes(label = permanova), 
+    x = -2, y = 1.25, hjust = 0, size = 1.8, color = "grey50") +
+  
+  # P-value from Dispersion
+  geom_text(
+    data = label_nmds_bird, aes(label = dispersion), 
+    x = -2, y = 1.1, hjust = 0, size = 1.8, color = "grey50") +
+  
+  
+  # adjustment
+  ylim(-1.4, 1.4) +
+  labs(title = "Bird", fill = "Time", color = "Time") + 
+  scale_x_continuous(limits = c(-2, 2)) +
+  scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+  scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
+  theme_bw(base_size = 8) +
+  theme(
+    axis.title.y = element_blank(),
+    panel.grid = element_blank(),
+    plot.title = element_text(hjust = 0, vjust = -5),
+    strip.background = element_blank(),
+    strip.text.x = element_text(hjust = 1),
+    legend.position = "none"
+  ) 
+
+
+
+
+
+# Butterfly
+p_nmds_butterfly <- comp_butterfly %>% 
+  dplyr::select(exotic, nmds_score) %>% 
+  unnest(nmds_score) %>% 
+  dplyr::mutate(
+    time = c(rep(c("Present", "Past"), 14)),
+    time = factor(time, levels = c("Past", "Present"))
+  ) %>% 
+  
+  ggplot(aes(x = NMDS1, y = NMDS2, color = time)) +
+  geom_point(size = 0.8) +
+  stat_ellipse(
+    aes(group = time, fill = time), 
+    alpha = 0.1, linewidth = 0.1,
+    geom = "polygon"
+    ) +
+  
+  facet_wrap(exotic~., ncol = 1) +
+  
+  # Stress value
+  geom_text(
+    data = label_nmds_butterfly, aes(label = stress), 
+    x = -1.25, y = 1, size = 1.8, color = "grey50", hjust = 0) +
+  
+  # permanova
+  geom_text(
+    data = label_nmds_butterfly, aes(label = permanova), 
+    x = -1.25, y = 0.88, size = 1.8, color = "grey50", hjust = 0) +
+  
+  # P-value from Dispersion
+  geom_text(
+    data = label_nmds_butterfly, aes(label = dispersion), 
+    x = -1.25, y = 0.76, size = 1.8, color = "grey50", hjust = 0) +
+  
+  
+  labs(title = "Butterfly") + 
+  ylim(c(-1, 1)) +
+  scale_x_continuous(breaks = seq(-1, 1, length = 3)) +
+  scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+  scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
+  theme_bw(base_size = 8) +
+  theme(
+    panel.grid = element_blank(),
+    legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    plot.title = element_text(hjust = 0, vjust = -5),
+    strip.background = element_blank(),
+    strip.text.x = element_text(hjust = 1)
+    )
+
+
+
+
+
+## Combine 
+p_nmds_plant + p_nmds_bird +  p_nmds_butterfly
+```
+
+# Fig.3
+Relationships between temporal changes in species richness from the past to the present and years between surveys
+
+
+## Estimate species richness
+```{r message=FALSE, warning=FALSE}
+# Function of estimation for species richness 
+est_sr <- function(x) {
+  x %>% 
+    dplyr::filter(value == 1 & (exotic == "Native" | exotic == "Exotic")) %>% 
+    dplyr::group_by(site, time, exotic) %>% 
+    dplyr::summarise(sr = n_distinct(sciname), .groups = "drop") %>% 
+    pivot_wider(
+      names_from = "exotic", 
+      values_from = "sr",
+      values_fill = list(sr = 0)
+      ) %>% 
+    dplyr::mutate(All = Native + Exotic) %>% 
+    pivot_longer(c(All, Native, Exotic), 
+                 values_to = "sr", names_to = "exotic") %>% 
+    dplyr::mutate(
+      exotic = recode_factor(
+        exotic, 
+        "All" = "All species",
+        "Native" = "Native species",
+        "Exotic" = "Exotic species"),
+      time = recode_factor(
+        time,
+        "past" = "Past",
+        "now"  = "Present")
+      ) 
+}
+
+
+
+# Estimate a species richness
+sr_plant <- est_sr(df_plant)
+sr_bird <- est_sr(df_bird)
+sr_butterfly <- est_sr(df_butterfly)
+```
+
+## GLM
+```{r}
+# Plant
+glm_sr_plant <- sr_plant %>% 
+  left_join(df_env, by = "site") %>% 
+  pivot_wider(names_from = time, values_from = sr) %>% 
+  dplyr::mutate(tem_sr = Present - Past) %>% 
+  
+  group_nest(exotic) %>% 
+  dplyr::mutate(
+    model = map(data, ~ glm(tem_sr ~ year + green_rate + area, data = .)),
+    summary = map(model, ~tidy(.)),
+    predict = map(model, ~ggpredict(., terms = "year"))
+    )
+
+
+# Bird
+glm_sr_bird <- sr_bird %>% 
+  left_join(df_env, by = "site") %>% 
+  pivot_wider(names_from = time, values_from = sr) %>% 
+  dplyr::mutate(tem_sr = Present - Past) %>% 
+  group_nest(exotic) %>% 
+  dplyr::mutate(
+    model = map(data, ~ glm(tem_sr ~ year + green_rate + area, data = .)),
+    summary = map(model, ~tidy(.))
+    )
+
+
+# Butterfly
+glm_sr_butterfly <- sr_butterfly %>% 
+  left_join(df_env, by = "site") %>% 
+  pivot_wider(names_from = time, values_from = sr) %>% 
+  dplyr::mutate(tem_sr = Present - Past) %>% 
+  
+  group_nest(exotic) %>% 
+  dplyr::mutate(
+    model = map(data, ~ glm(tem_sr ~ year + green_rate + area, data = .)),
+    summary = map(model, ~tidy(.))
+  )
+```
+
+## Table for GLM
+
+```{r}
+### Table for GLM -----
+tidy_table <- function(x) {
+  
+  x %>% 
+    dplyr::select(-data, -model) %>% 
+    tidyr::unnest(summary) %>% 
+    dplyr::filter(term != "(Intercept)") %>% 
+    dplyr::mutate(
+      # round
+      across(where(is.numeric),
+             ~ if_else(abs(.) <= 0.001,
+                     formatC(., digits = 3, format = "e"),
+                     formatC(., digits = 3, format = "fg")))
+    ) %>% 
+    dplyr::rename(
+      "Explanatory variables" = term,
+      Estimate = estimate,
+      Std.error = std.error,
+      Statistic = statistic
+    ) 
+}
+
+bind_rows(
+  tidy_table(glm_sr_plant) %>% dplyr::mutate(species = "Plant"),
+  tidy_table(glm_sr_bird) %>% dplyr::mutate(species = "Bird"),
+  tidy_table(glm_sr_butterfly) %>% dplyr::mutate(species = "Butterfly")
+  ) %>% 
+  dplyr::select(species, everything(), -predict) %>% 
+  kableExtra::kable()
+```
+## Plot for GLM
+```{r fig.width=8, fig.height=4}
+plot_glm_tempSR_plant <- 
+  ggplot() + 
+  geom_point(
+    data = glm_sr_plant %>% unnest(data)  %>% 
+      dplyr::filter(exotic != "Exotic species"),
+    aes(year, tem_sr, color = exotic, fill = exotic)
+    ) +
+  geom_smooth(
+    data = glm_sr_plant %>% unnest(predict) %>% 
+      dplyr::filter(exotic != "Exotic species"),
+    aes(x, predicted, color = exotic, fill = exotic)
+    ) +
+  geom_ribbon(
+    data = glm_sr_plant %>% unnest(predict) %>% 
+      dplyr::filter(exotic != "Exotic species"),
+    aes(x, ymin = conf.low, ymax = conf.high, fill = exotic),
+    alpha = 0.1
+    ) +
+  
+  scale_color_npg() +
+  scale_fill_npg() +
+  theme_bw(base_size = 10) +
+  labs(
+    title = "Plant",
+    y = "Temporal changes in species richness"
+    ) +
+  theme(
+    legend.position = c(0.7, 0.9),
+    legend.background = element_blank(),
+    legend.title = element_blank(),
+    legend.text = element_text(size = 8),
+    legend.key.size = unit(5, "mm"),
+    axis.title.x = element_blank(),
+    strip.placement = "outside",
+    strip.background = element_blank(),
+    panel.grid = element_blank()
+    )
+
+
+
+# Bird
+plot_glm_tempSR_bird <- 
+  ggplot() + 
+  geom_point(
+    data = glm_sr_bird %>% unnest(data) %>% 
+      dplyr::filter(exotic != "Exotic species"),
+    aes(year, tem_sr, color = exotic, fill = exotic)
+  ) +
+  scale_color_npg() +
+  scale_fill_npg() +
+  theme_bw(base_size = 10) +
+  labs(
+    title = "Bird",
+    x = "Years between surveys") +
+  theme(
+    legend.position = "none",
+    axis.title.y = element_blank(),
+    strip.placement = "outside",
+    strip.background = element_blank(),
+    panel.grid = element_blank()
+    )
+
+
+# Butterfly
+plot_glm_tempSR_butterfly <- 
+  ggplot() + 
+  geom_point(
+    data = glm_sr_butterfly %>% unnest(data) %>% 
+      dplyr::filter(exotic != "Exotic species"),
+    aes(year, tem_sr, color = exotic, fill = exotic)
+  ) +
+  scale_color_npg() +
+  scale_fill_npg() +
+  theme_bw(base_size = 10) +
+  labs(title = "Butterfly") +
+  theme(
+    legend.position = "none",
+    axis.title.y = element_blank(),
+    axis.title.x = element_blank(),
+    strip.placement = "outside",
+    strip.background = element_blank(),
+    panel.grid = element_blank()
+  )
+
+  
+
+
+
+# combine
+plot_glm_tempSR_plant + plot_glm_tempSR_bird + plot_glm_tempSR_butterfly
+```
+
+# Fig. 4
+Relationships between temporal beta diversity (differences in species composition between the past and present) and years between surveys.
+
+## Estimate temporal beta diversity
+Function of estimate for partitioning of beta diversity
+```{r message=FALSE, warning=FALSE}
+# Function of estimate for partitioning of beta diversity
+est_betapart <- function(x) {
+  
+  x %>%
+    dplyr::filter(value == 1) %>% 
+    dplyr::select(site, time, sciname, value) %>% 
+    pivot_wider(
+      names_from = sciname, 
+      values_from = value,
+      values_fill = 0
+      ) %>%  
+    dplyr::select(-time) %>% 
+    dplyr::group_nest(site) %>% 
+    dplyr::mutate(
+      betapart = map(data, ~beta.pair(., index.family="jac")),
+      tidy_beta = map(betapart, ~bind_rows(.))
+    ) %>% 
+    
+    dplyr::select(site, tidy_beta) %>% 
+    tidyr::unnest(tidy_beta) 
+}
+```
+
+Estimate a temporal beta diversity
+```{r}
+# Plant
+df_betapart_plant <- bind_rows(
+  
+  # all species
+  est_betapart(df_plant),
+  
+  # native species
+  df_plant %>% 
+    dplyr::filter(exotic == "Native") %>% 
+    est_betapart(),
+  
+  ) %>% 
+  dplyr::mutate(
+    species = "Plant",
+    exotic = rep(c("All","Native"), each = 15),
+    across(starts_with("beta"), ~as.numeric(.))
+  ) 
+  
+  
+
+
+# Bird
+df_betapart_bird <- bind_rows(
+  
+  # All species
+  est_betapart(df_bird),
+  
+  # Native species
+  df_bird %>% 
+    dplyr::filter(exotic == "Native") %>% 
+    est_betapart()
+  
+  ) %>% 
+  dplyr::mutate(
+    species = "Bird",
+    exotic = rep(c("All","Native"), each = 7),
+    across(starts_with("beta"), ~as.numeric(.))
+  ) 
+
+
+
+# Butterfly
+df_betapart_butterfly <- bind_rows(
+  
+  # All species
+  est_betapart(df_butterfly),
+  
+  # Native species
+  df_butterfly %>% 
+    dplyr::filter(exotic == "Native") %>% 
+    est_betapart()
+  
+  ) %>% 
+  dplyr::mutate(
+    species = "Butterfly",
+    exotic = rep(c("All","Native"), each = 7),
+    across(starts_with("beta"), ~as.numeric(.))
+  ) 
+
+
+
+# combine
+df_betapart <- bind_rows(
+  df_betapart_plant, df_betapart_bird, df_betapart_butterfly) %>% 
+  pivot_longer(cols = starts_with("beta")) %>% 
+  left_join(df_env, by = "site")
+```
+
+## GLM 
+GLM for temporal beta diversity
+```{r}
+glm_betapart <- 
+  df_betapart %>% 
+  dplyr::group_nest(species, exotic, name) %>% 
+  dplyr::mutate(
+    model = map(data, ~lm(value ~ year + area + green_rate, data = .)),
+    summary = map(model, ~tidy(.)),
+    predict = map(model, ~ggpredict(., terms = "year")),
+    
+    species = fct_relevel(species, c("Plant", "Bird", "Butterfly")),
+    exotic = factor(exotic, levels = c("All", "Native")),
+    beta =  fct_recode(name, 
+                       "Beta diversity" = "beta.jac",
+                       "Turnover" = "beta.jtu",
+                       "Nestedness" = "beta.jne")
+    ) %>% 
+  arrange(species, exotic)
+```
+
+## Table for GLM
+
+```{r}
+glm_betapart %>% 
+  tidyr::unnest(summary) %>% 
+  dplyr::filter(term != "(Intercept)" & name == "beta.jac") %>% 
+  dplyr::select(-data, -model, -predict, -name, -beta) %>% 
+  dplyr::mutate(
+      # round
+      across(where(is.numeric),
+             ~ if_else(abs(.) <= 0.001,
+                       formatC(., digits = 3, format = "e"),
+                       formatC(., digits = 3, format = "fg"))),
+    ) %>% 
+    dplyr::rename(
+      "Explanatory variables" = term,
+      Estimate = estimate,
+      Std.error = std.error,
+      Statistic = statistic
+      ) 
+```
+
+## Plot for GLM
+
+```{r fig.width=8, fig.height=8}
+#plot_glm_tempbeta <- 
+  ggplot() + 
+  geom_point(
+    data = glm_betapart %>% 
+      unnest(data) %>% 
+      dplyr::filter(exotic != "Exotic" & name == "beta.jac"),
+    aes(year, value, color = exotic, fill = exotic)
+    ) +
+  geom_line(
+    data = glm_betapart %>% 
+      dplyr::filter(
+          species == "Bird" & exotic != "Exotic" & name == "beta.jac"
+          ) %>% 
+      unnest(predict),
+    aes(x, predicted, color = exotic), linewidth = 1
+    ) +
+  geom_ribbon(
+    data = glm_betapart %>% 
+      dplyr::filter(
+        species == "Bird" & exotic != "Exotic" & name == "beta.jac"
+        ) %>% 
+      unnest(predict),
+    aes(x, ymin = conf.low, ymax = conf.high, fill = exotic),
+    alpha = 0.1
+    ) +
+  facet_grid(.~ species, scales = "free") +
+  scale_y_continuous(breaks = seq(0, 0.9, length = 4))+
+  scale_color_npg(labels = c(All = "All species", Native = "Native species")) +
+  scale_fill_npg(labels = c(All = "All species", Native = "Native species")) +
+  labs(x = "Years between surveys", y = "Temporal beta diversity") +
+  theme_bw(base_size = 10) +
+  theme(
+    legend.position = c(0.09, 0.9),
+    legend.background = element_blank(),
+    legend.title = element_blank(),
+    legend.text = element_text(size = 7),
+    legend.key.size = unit(5, "mm"),
+    strip.placement = "outside",
+    strip.background = element_blank(),
+    strip.text = element_text(size = 10),
+    strip.text.x = element_text(hjust = 0), 
+    panel.grid = element_blank()
+    )
+```
+
+
+# Table 2
+Relationships between the proportion of species lost and functional traits and environmental variables.
+
+## Esimate lost species richness
+```{r message=FALSE, warning=FALSE}
+# plant
+df_lost_plant <- df_plant %>% 
+  pivot_wider(names_from = time, values_from = value, values_fill = 0) %>% 
+  dplyr::group_by(site, sciname, growth, disper, exotic) %>% 
+  dplyr::summarise(past = sum(past), now = sum(now)) %>% 
+  dplyr::mutate(lost = if_else(past == 1 & now == 0, 1, 0)) %>%  
+  dplyr::filter(past == 1) %>% 
+  dplyr::select(-1, -now, -past) %>% 
+  dplyr::left_join(df_env, by = "site")
+
+
+# bird
+df_lost_bird <- df_bird %>% 
+  pivot_wider(names_from = time, values_from = value, values_fill = 0) %>% 
+  rename(HWI = "Hand-Wing.Index",
+         Beak = "Beak.Length_Culmen") %>% 
+  dplyr::group_by(site, sciname, exotic) %>% 
+  dplyr::summarise(
+    past = sum(past), now = sum(now),
+    Beak = mean(Beak), HWI = mean(HWI), Mass = mean(Mass)
+    ) %>% 
+  dplyr::mutate(lost = if_else(past == 1 & now == 0, 1, 0)) %>% 
+  dplyr::filter(past == 1) %>% 
+  dplyr::select(-now, -past) %>% 
+  dplyr::left_join(df_env, by = "site") %>% 
+  ungroup()
+
+
+# butterfly
+df_lost_butterfly <- df_butterfly %>% 
+  pivot_wider(names_from = time, values_from = value, values_fill = 0) %>% 
+  dplyr::group_by(site, sciname, exotic) %>% 
+  dplyr::summarise(
+    past = sum(past), now = sum(now),
+    FlightDuration = mean(FlightDuration), WS = mean(WS), 
+    hostplant = mean(hostplant)
+    ) %>% 
+  dplyr::mutate(lost = if_else(past == 1 & now == 0, 1, 0)) %>% 
+  dplyr::filter(past == 1) %>% 
+  dplyr::select(-now, -past) %>% 
+  dplyr::left_join(df_env, by = "site") %>% 
+  ungroup()
+```
+
+## GLM
+GLM for proportion of lost species (only for native species)
+```{r warning=FALSE}
+# plant
+glm_lost_plant <- 
+  df_lost_plant %>% 
+  dplyr::filter(exotic == "Native") %>% 
+  glm(lost ~ year + area + green_rate + growth + disper + 
+        year:growth + year:disper,
+      family = "binomial", data = .)
+
+
+# bird
+glm_lost_bird <- df_lost_bird %>% 
+  dplyr::filter(exotic == "Native") %>% 
+  glm(lost ~ year + area + green_rate + Mass + Beak + HWI +
+        year:Mass + year:Beak + year:HWI,
+      family = "binomial", data = .) 
+
+
+# butterfly
+glm_lost_butterfly <- df_lost_butterfly %>% 
+  glm(lost ~ year + area + green_rate + FlightDuration + WS + hostplant + 
+        year:FlightDuration + year:WS + year:hostplant,
+      family = "binomial", data = .) 
+```
+## Table for GLM
+```{r}
+# function for table of GLM 
+tidy_table_lost <- function(x) {
+  
+  x %>% 
+    tidy() %>%   
+    dplyr::filter(term != "(Intercept)") %>% 
+    dplyr::mutate(
+      # round
+      across(where(is.numeric),
+             ~ if_else(abs(.) <= 0.001,
+                       formatC(., digits = 3, format = "e"),
+                       formatC(., digits = 3, format = "fg")))
+    ) %>% 
+    dplyr::rename(
+      "Explanatory variables" = term,
+      Estimate = estimate,
+      Std.error = std.error,
+      Statistic = statistic
+    ) 
+}
+
+
+
+bind_rows(
+  tidy_table_lost(glm_lost_plant) %>% dplyr::mutate(species = "Plant"),
+  tidy_table_lost(glm_lost_bird) %>% dplyr::mutate(species = "Bird"),
+  tidy_table_lost(glm_lost_butterfly) %>% dplyr::mutate(species = "Butterfly")
+  ) %>% 
+  dplyr::select(species, "Explanatory variables", Estimate, p.value) %>% 
+  kableExtra::kable()
+```
 
 

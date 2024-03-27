@@ -392,8 +392,6 @@ df_disper <- bind_rows(try_disper, pic_disper, aust_disper, leda_disper) %>%
   dplyr::select(-wind:-gravity)
 
 
-# .-------
-
 
 
 

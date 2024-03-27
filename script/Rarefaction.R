@@ -102,7 +102,7 @@ p_inext_plant <-
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
     scale_x_continuous(limits = c(0, 30)) +
-    theme_bw(base_size = 8) +
+    theme_bw(base_size = 9) +
     theme(
       panel.grid = element_blank(),
       plot.subtitle = element_text(hjust = 0.5, size = 10),
@@ -122,7 +122,7 @@ p_inext_plant_n <-
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
     scale_x_continuous(limits = c(0, 30)) +
-    theme_bw(base_size = 8) +
+    theme_bw(base_size = 9) +
     theme(
       panel.grid = element_blank(),
       plot.subtitle = element_text(hjust = 0.5, size = 10),
@@ -143,7 +143,7 @@ p_inext_plant_e <-
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
     #scale_y_continuous(limits = c(0, 1500)) +
-    theme_bw(base_size = 8) +
+    theme_bw(base_size = 9) +
     theme(
       panel.grid = element_blank(),
       plot.subtitle = element_text(hjust = 0.5, size = 10),
@@ -166,7 +166,7 @@ p_inext_bird <-
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
     scale_x_continuous(limits = c(0, 15)) +
-    theme_bw(base_size = 8) +
+    theme_bw(base_size = 9) +
     theme(
       panel.grid = element_blank(),
       axis.title.x = element_blank(),
@@ -187,7 +187,7 @@ p_inext_bird_n <-
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
     scale_x_continuous(limits = c(0, 15)) +
-    theme_bw(base_size = 8) +
+    theme_bw(base_size = 9) +
     theme(
       panel.grid = element_blank(),
       #axis.title.x = element_blank(),
@@ -208,7 +208,7 @@ p_inext_butterfly <-
     scale_color_manual(values = c("#00AFBB", "#E7B800")) +
     scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
     scale_x_continuous(limits = c(0, 15)) +
-    theme_bw(base_size = 8) +
+    theme_bw(base_size = 9) +
     theme(
       panel.grid = element_blank(),
       axis.title.x = element_blank(),
@@ -228,7 +228,7 @@ p_inext_butterfly_n <-
   scale_color_manual(values = c("#00AFBB", "#E7B800")) +
   scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
   scale_x_continuous(limits = c(0, 15)) +
-  theme_bw(base_size = 8) +
+  theme_bw(base_size = 9) +
   theme(
     panel.grid = element_blank(),
     #axis.title.x = element_blank(),
