@@ -1,6 +1,17 @@
 
 # Partitioning of beta diversity
 
+# Package ----------------
+pacman::p_load(
+  tidyverse,  # data management
+  lme4, lmerTest, broom, multcomp, #GLM
+  ggeffects, patchwork, ggsci, ggsignif,  # ggplot
+  vegan, iNEXT, betapart, # composition
+  exactRankTests  # wilcoxon test
+)
+
+
+
 # Function of estimate for partitioning of beta diversity
 est_betapart <- function(x) {
   
@@ -15,7 +26,7 @@ est_betapart <- function(x) {
     dplyr::select(-time) %>% 
     dplyr::group_nest(site) %>% 
     dplyr::mutate(
-      betapart = map(data, ~beta.pair(.)),
+      betapart = map(data, ~beta.pair(., index.family="jac")),
       tidy_beta = map(betapart, ~bind_rows(.))
     ) %>% 
     
@@ -195,9 +206,9 @@ glm_betapart <- df_betapart %>%
     species = factor(species, levels = c("Plant", "Bird", "Butterfly")),
     exotic = factor(exotic, levels = c("All", "Native", "Exotic")),
     beta =  fct_recode(name, 
-                       "Beta diversity" = "beta.sor",
-                       "Turnover" = "beta.sim",
-                       "Nestedness" = "beta.sne")
+                       "Beta diversity" = "beta.jac",
+                       "Turnover" = "beta.jtu",
+                       "Nestedness" = "beta.jne")
     ) 
 
 
@@ -205,9 +216,9 @@ glm_betapart <- df_betapart %>%
 
 ## Table for GLM
 tb_glm_betapart <- glm_betapart %>% 
-  dplyr::select(-data, -model) %>% 
+  dplyr::select(-data, -model, -predict) %>% 
   tidyr::unnest(summary) %>% 
-  dplyr::filter(term != "(Intercept)") %>% 
+  dplyr::filter(term != "(Intercept)" & name == "beta.jac") %>% 
   dplyr::mutate(
       # round
       across(where(is.numeric),
@@ -233,50 +244,46 @@ tb_glm_betapart <- glm_betapart %>%
 plot_glm_tempbeta <- 
   ggplot() + 
   geom_point(
-    data = glm_betapart %>% unnest(data),
+    data = glm_betapart %>% 
+      unnest(data) %>% 
+      dplyr::filter(exotic != "Exotic" & name == "beta.jac"),
     aes(year, value, color = exotic, fill = exotic)
     ) +
   geom_line(
     data = glm_betapart %>% 
       dplyr::filter(
-        species == "Plant" & exotic == "Native" & name == "beta.sne" |
-          species == "Plant" & exotic == "Exotic" & name == "beta.sor" |
-          species == "Bird" & exotic == "All" & name != "beta.sim" |
-          species == "Bird" & exotic == "Native" & name == "beta.sor" 
-        ) %>% 
+          species == "Bird" & exotic != "Exotic" & name == "beta.jac"
+          ) %>% 
       unnest(predict),
-    aes(x, predicted, color = exotic)
+    aes(x, predicted, color = exotic), size = 1
     ) +
   geom_ribbon(
     data = glm_betapart %>% 
       dplyr::filter(
-        species == "Plant" & exotic == "Native" & name == "beta.sne" |
-          species == "Plant" & exotic == "Exotic" & name == "beta.sor" |
-          species == "Bird" & exotic == "All" & name != "beta.sim" |
-          species == "Bird" & exotic == "Native" & name == "beta.sor" 
-      ) %>% 
+        species == "Bird" & exotic != "Exotic" & name == "beta.jac"
+        ) %>% 
       unnest(predict),
     aes(x, ymin = conf.low, ymax = conf.high, fill = exotic),
-    alpha = 0.2
+    alpha = 0.1
     ) +
-  facet_grid(fct_rev(beta) ~ species, switch = "y") +
+  facet_grid(. ~ species, switch = "y") +
   scale_y_continuous(breaks = seq(0, 0.9, length = 4))+
-  scale_color_simpsons(labels = c(All = "All species",
-                                  Native = "Native species",
-                                  Exotic = "Exotic species")) +
-  scale_fill_simpsons(labels = c(All = "All species",
-                                 Native = "Native species",
-                                 Exotic = "Exotic species")) +
+  scale_color_npg(labels = c(All = "All species",
+                             Native = "Native species")) +
+  scale_fill_npg(labels = c(All = "All species",
+                            Native = "Native species")) +
 
-  labs(x = "Years beteen surveys") +
+  labs(
+    x = "Years between surveys",
+    y = "Temporal beta diversity"
+    ) +
   theme_bw(base_size = 13) +
   theme(
-    legend.position = c(0.9, 0.94),
+    legend.position = c(0.9, 0.9),
     legend.background = element_blank(),
     legend.title = element_blank(),
     legend.text = element_text(size = 8),
     legend.key.size = unit(5, "mm"),
-    axis.title.y = element_blank(),
     strip.placement = "outside",
     strip.background = element_blank(),
     panel.grid = element_blank()
@@ -284,5 +291,5 @@ plot_glm_tempbeta <-
 
 
 ggsave(plot_glm_tempbeta, file = "output/plot_glm_tempbeta.png",
-       width = 180, height = 180, units = "mm", dpi = 600)
+       width = 170, height = 80, units = "mm", dpi = 600)
 

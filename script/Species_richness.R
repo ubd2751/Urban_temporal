@@ -313,7 +313,7 @@ tb_glm_sr <- bind_rows(
 
 
 
-### Plot for GLM -----
+## Plot for GLM -----
 
 # Plant
 plot_glm_tempSR_plant <- 
@@ -332,23 +332,26 @@ plot_glm_tempSR_plant <-
     data = glm_sr_plant %>% unnest(predict) %>% 
       dplyr::filter(exotic != "Exotic species"),
     aes(x, ymin = conf.low, ymax = conf.high, fill = exotic),
-    alpha = 0.2
+    alpha = 0.1
     ) +
   
-  scale_color_simpsons() +
-  scale_fill_simpsons() +
-  theme_classic() +
+  scale_color_npg() +
+  scale_fill_npg() +
+  theme_bw() +
   labs(
     title = "Plant",
     y = "Temporal changes in species richness"
     ) +
   theme(
-    legend.position = c(0.3, 0.2),
+    legend.position = c(0.7, 0.9),
     legend.background = element_blank(),
     legend.title = element_blank(),
     legend.text = element_text(size = 8),
     legend.key.size = unit(5, "mm"),
-    axis.title.x = element_blank()
+    axis.title.x = element_blank(),
+    strip.placement = "outside",
+    strip.background = element_blank(),
+    panel.grid = element_blank()
   )
 
 
@@ -361,15 +364,18 @@ plot_glm_tempSR_bird <-
       dplyr::filter(exotic != "Exotic species"),
     aes(year, tem_sr, color = exotic, fill = exotic)
   ) +
-  scale_color_simpsons() +
-  scale_fill_simpsons() +
-  theme_classic() +
+  scale_color_npg() +
+  scale_fill_npg() +
+  theme_bw() +
   labs(
     title = "Bird",
     x = "Years between surveys") +
   theme(
     legend.position = "none",
-    axis.title.y = element_blank()
+    axis.title.y = element_blank(),
+    strip.placement = "outside",
+    strip.background = element_blank(),
+    panel.grid = element_blank()
   )
 
 
@@ -381,14 +387,17 @@ plot_glm_tempSR_butterfly <-
       dplyr::filter(exotic != "Exotic species"),
     aes(year, tem_sr, color = exotic, fill = exotic)
   ) +
-  scale_color_simpsons() +
-  scale_fill_simpsons() +
-  theme_classic() +
+  scale_color_npg() +
+  scale_fill_npg() +
+  theme_bw() +
   labs(title = "Butterfly") +
   theme(
     legend.position = "none",
     axis.title.y = element_blank(),
-    axis.title.x = element_blank()
+    axis.title.x = element_blank(),
+    strip.placement = "outside",
+    strip.background = element_blank(),
+    panel.grid = element_blank()
   )
 
   
